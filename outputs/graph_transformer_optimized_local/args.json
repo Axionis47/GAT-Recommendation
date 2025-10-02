@@ -1,0 +1,18 @@
+{
+  "train_sessions": "data/processed/train.csv",
+  "val_sessions": "data/processed/val.csv",
+  "graph_edges": "data/processed/graph_edges.csv",
+  "output_dir": "outputs/graph_transformer_optimized_local",
+  "embedding_dim": 256,
+  "hidden_dim": 256,
+  "num_layers": 2,
+  "num_heads": 2,
+  "dropout": 0.1,
+  "batch_size": 16,
+  "lr": 0.001,
+  "weight_decay": 1e-05,
+  "max_epochs": 3,
+  "patience": 10,
+  "seed": 42,
+  "device": "cpu"
+}

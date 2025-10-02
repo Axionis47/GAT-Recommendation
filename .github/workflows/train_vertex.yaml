@@ -1,0 +1,81 @@
+name: Train on Vertex AI (Disabled)
+
+on:
+  workflow_dispatch:
+  # Disabled until GCP secrets are configured
+    inputs:
+      config_path:
+        description: 'GCS path to config file (e.g., gs://bucket/configs/model.yaml)'
+        required: true
+        type: string
+      job_name_suffix:
+        description: 'Suffix for job name (e.g., baseline-v1)'
+        required: true
+        type: string
+      image_tag:
+        description: 'Docker image tag to use'
+        required: false
+        default: 'latest'
+        type: string
+
+env:
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GCP_REGION: ${{ secrets.GCP_REGION }}
+  AR_REPO: ${{ secrets.AR_REPO }}
+  GCS_BUCKET: ${{ secrets.GCS_BUCKET }}
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev
+
+      - name: Build and push training image
+        run: |
+          docker build -f docker/Dockerfile.train \
+            -t ${{ env.AR_REPO }}/train:${{ inputs.image_tag }} \
+            -t ${{ env.AR_REPO }}/train:${{ github.sha }} .
+          docker push ${{ env.AR_REPO }}/train:${{ inputs.image_tag }}
+          docker push ${{ env.AR_REPO }}/train:${{ github.sha }}
+
+      - name: Submit Vertex AI Custom Job
+        id: vertex_job
+        run: |
+          JOB_NAME="etp-gt-${{ inputs.job_name_suffix }}-$(date +%Y%m%d-%H%M%S)"
+          bash scripts/gcp/03_vertex_custom_job.sh \
+            --config ${{ inputs.config_path }} \
+            --job-name ${JOB_NAME} \
+            --image-tag ${{ inputs.image_tag }}
+          echo "job_name=${JOB_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Job Summary
+        run: |
+          echo "## Vertex AI Training Job" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Job Name**: ${{ steps.vertex_job.outputs.job_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Config**: ${{ inputs.config_path }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: ${{ env.AR_REPO }}/train:${{ inputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "View job in [Vertex AI Console](https://console.cloud.google.com/vertex-ai/training/custom-jobs?project=${{ env.GCP_PROJECT_ID }})" >> $GITHUB_STEP_SUMMARY
+
+      # TODO: Add step to download and upload metrics as artifact once job completes
+
