@@ -1,0 +1,50 @@
+# Ablation Studies Configuration
+# TODO: Populate in Phase 6
+
+base_config: configs/yoochoose_etpgt_small.yaml
+
+# Ablation matrix
+ablations:
+  - name: full_etpgt
+    description: Full ETP-GT model (baseline for ablations)
+    overrides: {}
+  
+  - name: no_temporal_bias
+    description: Disable temporal delta bias
+    overrides:
+      model:
+        use_dt_bias: false
+  
+  - name: no_edge_bias
+    description: Disable edge type bias
+    overrides:
+      model:
+        use_edge_bias: false
+  
+  - name: no_path_bias
+    description: Disable path length bias
+    overrides:
+      model:
+        use_path_bias: false
+  
+  - name: no_contrastive
+    description: Disable contrastive loss
+    overrides:
+      loss:
+        contrastive_weight: 0.0
+        listwise_weight: 1.0
+  
+  - name: no_cls_token
+    description: Disable CLS token readout
+    overrides:
+      model:
+        use_cls_token: false
+
+# Output
+output:
+  results_path: gs://<bucket>/artifacts/ablations/ablations.csv
+  individual_runs_dir: gs://<bucket>/artifacts/ablations/runs
+
+# Reproducibility
+seed: 42
+
