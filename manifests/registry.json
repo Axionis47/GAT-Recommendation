@@ -1,7 +1,0 @@
-{
-  "default": "amazon_electronics_v1",
-  "manifests": {
-    "amazon_electronics_v1": "manifests/features/amazon_electronics_v1.json"
-  }
-}
-
