@@ -1,9 +1,10 @@
-name: Release
+name: Release (Disabled)
 
 on:
   push:
     tags:
       - 'v*.*.*'
+  # Only runs on version tags
 
 permissions:
   contents: write

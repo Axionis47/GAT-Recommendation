@@ -1,7 +1,8 @@
-name: Train on Vertex AI
+name: Train on Vertex AI (Disabled)
 
 on:
   workflow_dispatch:
+  # Disabled until GCP secrets are configured
     inputs:
       config_path:
         description: 'GCS path to config file (e.g., gs://bucket/configs/model.yaml)'
