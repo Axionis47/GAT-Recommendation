@@ -82,8 +82,9 @@ workerPoolSpecs:
         - --gcs-bucket=${GCS_BUCKET}
         - --device=cuda
 scheduling:
-  timeout: 86400s
+  timeout: 604800s
   restartJobOnWorkerRestart: false
+  strategy: FLEX_START
 EOF
 )
 
