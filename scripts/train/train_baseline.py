@@ -33,7 +33,7 @@ def parse_args():
         "--model",
         type=str,
         required=True,
-        choices=["graphsage", "gat", "graph_transformer"],
+        choices=["graphsage", "gat", "graph_transformer", "graph_transformer_optimized"],
         help="Model type",
     )
     parser.add_argument("--embedding-dim", type=int, default=256, help="Embedding dimension")
