@@ -206,6 +206,17 @@ def main():
             readout_type=args.readout_type,
             use_laplacian_pe=True,
         )
+
+        # Precompute Laplacian PE for the full graph
+        logger.info("Precomputing Laplacian PE for the full graph...")
+        graph_df = pd.read_csv(args.graph_edges)
+        edge_index = torch.tensor(
+            [graph_df["item_i"].values, graph_df["item_j"].values],
+            dtype=torch.long,
+        )
+        graph_data = Data(edge_index=edge_index, num_nodes=num_items)
+        model.laplacian_pe.precompute(graph_data)
+        logger.info("Laplacian PE precomputed successfully")
     elif args.model == "graph_transformer_optimized":
         model = create_graph_transformer_optimized(
             num_items=num_items,
