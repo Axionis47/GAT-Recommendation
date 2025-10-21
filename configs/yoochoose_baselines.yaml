@@ -1,0 +1,52 @@
+# Baseline Models Configuration
+# TODO: Populate in Phase 4
+
+model_type: baseline  # graphsage | gat | graphtransformer
+
+# Model architecture
+model:
+  hidden_dim: 256
+  num_layers: 2
+  dropout: 0.2
+  # GraphSAGE specific
+  aggregation: mean  # mean | max | lstm
+  # GAT specific
+  num_heads: 4
+  # GraphTransformer specific
+  lappe_k: 16
+
+# Training
+training:
+  batch_size: 256
+  epochs: 50
+  lr: 0.001
+  weight_decay: 0.0001
+  warmup_steps_ratio: 0.05
+  gradient_clip: 1.0
+  early_stop_patience: 5
+  early_stop_metric: ndcg@20
+
+# Data
+data:
+  train_path: gs://<bucket>/data/processed/train.parquet
+  val_path: gs://<bucket>/data/processed/val.parquet
+  test_path: gs://<bucket>/data/processed/test.parquet
+  graph_path: gs://<bucket>/data/interim/graph_edges.parquet
+
+# Evaluation
+eval:
+  k_values: [10, 20]
+  stratify_by:
+    - session_length
+    - last_gap_dt
+
+# Logging
+logging:
+  wandb_project: etp-gt
+  wandb_entity: null
+  log_interval: 100
+  save_dir: gs://<bucket>/artifacts/baselines
+
+# Reproducibility
+seed: 42
+

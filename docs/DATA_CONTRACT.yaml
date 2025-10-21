@@ -1,0 +1,261 @@
+---
+# Data Contract for ETP-GT
+# Defines schemas for all data structures used in the system
+
+version: "1.0.0"
+last_updated: "2025-01-XX"
+
+schemas:
+  Event:
+    description: "Single user interaction event"
+    fields:
+      session_id:
+        type: string
+        required: true
+        description: "Unique session identifier"
+        example: "sess_abc123"
+      
+      ts:
+        type: integer
+        required: true
+        description: "Unix timestamp in milliseconds"
+        example: 1700000000000
+        constraints:
+          - "Must be monotonically increasing within a session"
+      
+      item_id:
+        type: integer
+        required: true
+        description: "Unique item identifier"
+        example: 42
+        constraints:
+          - "Must exist in item catalog"
+      
+      event_type:
+        type: string
+        required: true
+        description: "Type of interaction"
+        enum: ["view", "add_to_cart", "purchase"]
+        example: "view"
+
+  Session:
+    description: "Processed session with multiple events"
+    fields:
+      session_id:
+        type: string
+        required: true
+        description: "Unique session identifier"
+      
+      events:
+        type: array[Event]
+        required: true
+        description: "Ordered list of events"
+        constraints:
+          - "Length >= 3"
+          - "Timestamps strictly increasing"
+          - "Max gap between consecutive events <= 30 minutes"
+      
+      start_ts:
+        type: integer
+        required: true
+        description: "Timestamp of first event (ms)"
+      
+      end_ts:
+        type: integer
+        required: true
+        description: "Timestamp of last event (ms)"
+      
+      length:
+        type: integer
+        required: true
+        description: "Number of events in session"
+        constraints:
+          - ">= 3"
+
+  ItemEdge:
+    description: "Co-occurrence edge between items"
+    fields:
+      item_i:
+        type: integer
+        required: true
+        description: "Source item ID"
+      
+      item_j:
+        type: integer
+        required: true
+        description: "Target item ID"
+      
+      count:
+        type: integer
+        required: true
+        description: "Number of co-occurrences"
+        constraints:
+          - ">= 1"
+      
+      last_ts:
+        type: integer
+        required: true
+        description: "Most recent co-occurrence timestamp (ms)"
+      
+      event_pair_hist:
+        type: object
+        required: true
+        description: "Distribution of (event_i, event_j) type pairs"
+        example:
+          "view-view": 10
+          "view-cart": 3
+          "cart-purchase": 1
+
+  RecommendRequest:
+    description: "API request for recommendations"
+    fields:
+      session:
+        type: array[Event]
+        required: true
+        description: "Current session events"
+        constraints:
+          - "Length >= 1"
+          - "Timestamps strictly increasing"
+      
+      K:
+        type: integer
+        required: false
+        default: 20
+        description: "Number of recommendations to return"
+        constraints:
+          - "1 <= K <= 100"
+
+  RecommendResponse:
+    description: "API response with recommendations"
+    fields:
+      items:
+        type: array[ScoredItem]
+        required: true
+        description: "Ranked list of recommended items"
+      
+      attributions:
+        type: array[Attribution]
+        required: true
+        description: "Attribution traces for each recommendation"
+      
+      timing:
+        type: Timing
+        required: true
+        description: "Latency breakdown"
+      
+      version:
+        type: Version
+        required: true
+        description: "Model and system version info"
+
+  ScoredItem:
+    description: "Item with recommendation score"
+    fields:
+      item_id:
+        type: integer
+        required: true
+        description: "Item identifier"
+      
+      score:
+        type: float
+        required: true
+        description: "Recommendation score (0-1)"
+        constraints:
+          - "0.0 <= score <= 1.0"
+
+  Attribution:
+    description: "Attribution breakdown for a recommendation"
+    fields:
+      item_id:
+        type: integer
+        required: true
+        description: "Item identifier"
+      
+      edge_contribution:
+        type: float
+        required: true
+        description: "Contribution from edge type bias"
+      
+      dt_contribution:
+        type: float
+        required: true
+        description: "Contribution from temporal delta bias"
+      
+      path_contribution:
+        type: float
+        required: true
+        description: "Contribution from path length bias"
+
+  Timing:
+    description: "Latency breakdown"
+    fields:
+      ann_ms:
+        type: float
+        required: true
+        description: "ANN retrieval time (milliseconds)"
+      
+      rerank_ms:
+        type: float
+        required: true
+        description: "Re-ranking time (milliseconds)"
+      
+      total_ms:
+        type: float
+        required: true
+        description: "Total request time (milliseconds)"
+
+  Version:
+    description: "System version information"
+    fields:
+      git_sha:
+        type: string
+        required: true
+        description: "Git commit SHA"
+        example: "a1b2c3d4"
+      
+      model:
+        type: string
+        required: true
+        description: "Model identifier"
+        example: "etpgt-small@2025-01-15"
+      
+      index:
+        type: string
+        required: true
+        description: "ANN index identifier"
+        example: "ivfpq@2025-01-15"
+
+# Dataset-specific metadata
+datasets:
+  RetailRocket:
+    description: "E-commerce dataset from RetailRocket"
+    source: "https://www.kaggle.com/datasets/retailrocket/ecommerce-dataset"
+    
+    statistics:
+      total_events: "TBD"
+      total_sessions: "TBD"
+      total_items: "TBD"
+      date_range: "TBD"
+    
+    splits:
+      train:
+        ratio: 0.70
+        blackout_after: "1-3 days"
+      
+      val:
+        ratio: 0.15
+        blackout_after: "1-3 days"
+      
+      test:
+        ratio: 0.15
+    
+    event_types:
+      - view
+      - add_to_cart
+      - purchase
+    
+    coverage:
+      view: "~100%"
+      add_to_cart: "~10-20%"
+      purchase: "~1-5%"
+
