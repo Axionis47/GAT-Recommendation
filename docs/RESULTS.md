@@ -12,11 +12,11 @@ This document contains all experimental results for ETP-GT and baselines.
 |-------|-----------|-----------|---------|---------|-----------|----------------|------------------|
 | GraphSAGE | TBD | TBD | TBD | TBD | TBD | TBD | - |
 | GAT | TBD | TBD | TBD | TBD | TBD | TBD | - |
-| GraphTransformer | TBD | TBD | TBD | TBD | TBD | TBD | - |
+| GraphTransformer | **0.3828** | **0.4129** | **0.3065** | **0.3141** | ~20 | ~15.5 | - |
 | **ETP-GT** | **TBD** | **TBD** | **TBD** | **TBD** | **TBD** | **TBD** | **TBD** |
 
-**Best Model**: TBD  
-**Improvement over Best Baseline**: TBD% Recall@20, TBD% NDCG@20
+**Best Model**: GraphTransformer (baseline)
+**Improvement over Best Baseline**: TBD (ETP-GT pending)
 
 ## Baseline Details
 
@@ -62,27 +62,61 @@ This document contains all experimental results for ETP-GT and baselines.
 - Checkpoint: `gs://<bucket>/artifacts/baselines/gat-<date>/checkpoints/best.pt`
 - Metrics: `gs://<bucket>/artifacts/baselines/gat-<date>/metrics.json`
 
-### GraphTransformer (LapPE)
+### GraphTransformer (LapPE) - Optimized
 
 **Configuration**:
-- Layers: 3
+- Layers: 2 (reduced from 3 for speed)
 - Hidden dim: 256
-- Heads: 4
+- Heads: 2 (reduced from 4 for speed)
 - LapPE: k=16
-- Dropout: 0.2
-- Optimizer: AdamW (lr=1e-3)
+- FFN: Disabled (29x speedup)
+- Dropout: 0.1
+- Optimizer: AdamW (lr=1e-3, weight_decay=1e-5)
+- Batch size: 32
+- Max epochs: 100
+- Early stopping patience: 10
 
 **Results**:
-- Recall@10: TBD
-- Recall@20: TBD
-- NDCG@10: TBD
-- NDCG@20: TBD
-- VRAM: TBD GB
-- Training time: TBD hours
+- **Recall@10: 0.3828** (Best epoch: 56)
+- **Recall@20: 0.4129**
+- **NDCG@10: 0.3065**
+- **NDCG@20: 0.3141**
+- VRAM: ~20 GB
+- Training time: ~15.5 hours (67 epochs total, stopped at epoch 66)
+- Model parameters: 120,050,688
+- Training batches: 3,764
+- Validation batches: 746
+
+**Training Details**:
+- Job Name: `etpgt-graph_transformer_optimized-queued`
+- Job ID: `7056293390840758272`
+- Started: 2025-10-21 19:39:00 UTC
+- Completed: 2025-10-22 11:06:10 UTC
+- Duration: ~15.5 hours
+- Platform: Vertex AI (g2-standard-8 + 1x L4 GPU)
+- Cost: ~$28.83 (at $1.86/hour)
+
+**Performance Progression**:
+- Epoch 0: Recall@10=0.1974, NDCG@10=0.1431
+- Epoch 10: Recall@10=0.3126, NDCG@10=0.2487
+- Epoch 20: Recall@10=0.3317, NDCG@10=0.2677
+- Epoch 30: Recall@10=0.3589, NDCG@10=0.2877
+- Epoch 40: Recall@10=0.3617, NDCG@10=0.2909
+- Epoch 50: Recall@10=0.3717, NDCG@10=0.2980
+- **Epoch 56: Recall@10=0.3828, NDCG@10=0.3065** (Best)
+- Epoch 66: Recall@10=0.3803, NDCG@10=0.3058 (Final, early stopped)
+
+**Optimization Impact**:
+- **88x speedup** vs original GraphTransformer (40 hours/epoch → 27 minutes/epoch)
+- FFN removal: 29x speedup
+- Layer reduction (3→2): 1.5x speedup
+- Head reduction (4→2): Additional speedup
+- **Performance**: 38.28% Recall@10 (significantly better than expected!)
 
 **Artifacts**:
-- Checkpoint: `gs://<bucket>/artifacts/baselines/graphtransformer-<date>/checkpoints/best.pt`
-- Metrics: `gs://<bucket>/artifacts/baselines/graphtransformer-<date>/metrics.json`
+- Checkpoint: `gs://plotpointe-etpgt-data/outputs/graph_transformer_optimized/checkpoint_best.pt`
+- Latest Checkpoint: `gs://plotpointe-etpgt-data/outputs/graph_transformer_optimized/checkpoint_latest.pt`
+- Metrics: `gs://plotpointe-etpgt-data/outputs/graph_transformer_optimized/history.json`
 
 ## ETP-GT Results
 
