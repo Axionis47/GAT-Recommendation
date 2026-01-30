@@ -1,0 +1,24 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-f'
+      - 'docker/serve-onnx.Dockerfile'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/plotpointe/etpgt/etpgt-serve-onnx:v6'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/plotpointe/etpgt/etpgt-serve-onnx:latest'
+      - '.'
+  - name: 'aquasec/trivy:latest'
+    args:
+      - 'image'
+      - '--exit-code'
+      - '1'
+      - '--severity'
+      - 'CRITICAL,HIGH'
+      - '--ignore-unfixed'
+      - 'us-central1-docker.pkg.dev/plotpointe/etpgt/etpgt-serve-onnx:v6'
+images:
+  - 'us-central1-docker.pkg.dev/plotpointe/etpgt/etpgt-serve-onnx:v6'
+  - 'us-central1-docker.pkg.dev/plotpointe/etpgt/etpgt-serve-onnx:latest'
+timeout: '1200s'

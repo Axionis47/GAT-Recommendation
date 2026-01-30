@@ -7,54 +7,129 @@ on:
     branches: [main, develop]
 
 jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install linters
+        run: pip install ruff black isort
+
+      - name: Run ruff
+        run: ruff check etpgt/ tests/ scripts/
+
+      - name: Check black formatting
+        run: black --check etpgt/ tests/ scripts/
+
+      - name: Check isort
+        run: isort --check-only etpgt/ tests/ scripts/
+
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install torch-geometric
+          pip install -e .
+          pip install mypy types-PyYAML types-tqdm
+
+      - name: Run mypy
+        run: mypy etpgt/ --ignore-missing-imports
+
   test:
+    name: Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.10"]
+        python-version: ["3.10", "3.11", "3.12"]
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip'
 
-      - name: Install minimal dependencies
+      - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip setuptools wheel
-          pip install numpy torch pytest pytest-cov
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install torch-geometric
+          pip install -e ".[dev]"
+          pip install pytest pytest-cov
 
-      - name: Verify installation
+      - name: Run tests with coverage
         run: |
-          python -c "import numpy; import torch; print('Dependencies OK')"
-        continue-on-error: true
+          pytest tests/ -v \
+            --cov=etpgt \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-fail-under=60
 
-      - name: Run basic tests
-        run: |
-          pytest tests/test_utils.py -v || echo "Tests completed with warnings"
-        continue-on-error: true
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: matrix.python-version == '3.11'
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
 
-  build-check:
+  model-smoke-test:
+    name: Model Smoke Tests
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.11"
 
-      - name: Install build tools
+      - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip build
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install torch-geometric
+          pip install -e .
 
-      - name: Build package
+      - name: Run model smoke tests
+        run: pytest tests/test_models.py tests/test_ablations.py -v
+
+      - name: Run smoke test script
+        run: python scripts/smoke_test_all_models.py --device cpu --epochs 2
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install security tools
+        run: pip install bandit[toml] safety
+
+      - name: Run Bandit (SAST)
+        run: bandit -r etpgt/ scripts/serve/ -c pyproject.toml
+
+      - name: Check dependencies for vulnerabilities
         run: |
-          python -m build
-        continue-on-error: true
-
+          pip install -r requirements-serve-onnx.txt
+          safety check

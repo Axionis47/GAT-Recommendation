@@ -1,0 +1,104 @@
+# DVC Pipeline for GAT-Recommendation
+#
+# This defines the reproducible data pipeline:
+#   dvc repro           - Run full pipeline
+#   dvc dag             - Show pipeline DAG
+#   dvc metrics show    - Show metrics
+#
+# Data versioning:
+#   dvc add data/raw/events.csv   - Track raw data
+#   dvc push                       - Push to remote storage
+#   dvc pull                       - Pull from remote storage
+
+stages:
+  # Stage 1: Sessionization
+  sessionize:
+    cmd: python scripts/data/02_sessionize.py
+    deps:
+      - scripts/data/02_sessionize.py
+      - data/raw/events.csv
+    outs:
+      - data/interim/sessions.csv
+    metrics:
+      - data/interim/session_stats.json:
+          cache: false
+
+  # Stage 2: Temporal Split
+  split:
+    cmd: python scripts/data/03_temporal_split.py
+    deps:
+      - scripts/data/03_temporal_split.py
+      - data/interim/sessions.csv
+    outs:
+      - data/processed/train.csv
+      - data/processed/val.csv
+      - data/processed/test.csv
+    metrics:
+      - data/processed/split_info.json:
+          cache: false
+
+  # Stage 3: Build Graph
+  build_graph:
+    cmd: python scripts/data/04_build_graph.py
+    deps:
+      - scripts/data/04_build_graph.py
+      - data/processed/train.csv
+    outs:
+      - data/processed/graph_edges.csv
+    metrics:
+      - data/processed/graph_stats.json:
+          cache: false
+
+  # Stage 4: Model Validation (all models)
+  validate_models:
+    cmd: python scripts/pipeline/run_full_pipeline.py --num-sessions 100 --num-epochs 3
+    deps:
+      - scripts/pipeline/run_full_pipeline.py
+      - data/processed/train.csv
+      - data/processed/graph_edges.csv
+      - etpgt/model/
+    outs:
+      - data/test_subset/sessions_subset.csv
+      - data/test_subset/graph_subset.csv
+    metrics:
+      - data/test_subset/pipeline_results.json:
+          cache: false
+
+  # Stage 5: Train Best Model (GraphTransformer Optimized)
+  train:
+    cmd: >
+      python scripts/train/train_baseline.py
+      --model graph_transformer_optimized
+      --train-sessions data/processed/train.csv
+      --val-sessions data/processed/val.csv
+      --graph-edges data/processed/graph_edges.csv
+      --output-dir outputs/graph_transformer_optimized
+      --max-epochs 10
+    deps:
+      - scripts/train/train_baseline.py
+      - data/processed/train.csv
+      - data/processed/val.csv
+      - data/processed/graph_edges.csv
+      - etpgt/model/graph_transformer.py
+    outs:
+      - outputs/graph_transformer_optimized/best_model.pt:
+          cache: true
+    metrics:
+      - outputs/graph_transformer_optimized/metrics.json:
+          cache: false
+    params:
+      - train.batch_size
+      - train.lr
+      - train.num_epochs
+      - model.embedding_dim
+      - model.hidden_dim
+
+# Parameters file (create params.yaml)
+# params:
+#   train:
+#     batch_size: 32
+#     lr: 0.001
+#     num_epochs: 100
+#   model:
+#     embedding_dim: 256
+#     hidden_dim: 256
