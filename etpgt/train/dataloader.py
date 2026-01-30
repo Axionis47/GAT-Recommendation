@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
@@ -42,7 +43,7 @@ class SessionDataset(Dataset):
 
         # Build edge index (using item_i and item_j columns)
         self.edge_index = torch.tensor(
-            [self.graph_edges_df["item_i"].values, self.graph_edges_df["item_j"].values],
+            np.array([self.graph_edges_df["item_i"].values, self.graph_edges_df["item_j"].values]),
             dtype=torch.long,
         )
 
@@ -82,7 +83,7 @@ class SessionDataset(Dataset):
 
         # Truncate if too long
         if len(session_items) > self.max_session_length:
-            session_items = session_items[-self.max_session_length :]
+            session_items = session_items[-self.max_session_length:]
 
         # Target is last item
         target_item = session_items[-1]
@@ -93,17 +94,17 @@ class SessionDataset(Dataset):
         # Sample negative items (not in session)
         negative_items = self._sample_negatives(session_items)
 
-        # Build session subgraph (edges between context items)
-        session_edge_index = self._build_session_subgraph(context_items)
+        # Build session subgraph
+        edge_index = self._build_session_subgraph(context_items)
 
         return {
             "session_items": torch.tensor(context_items, dtype=torch.long),
             "target_item": torch.tensor(target_item, dtype=torch.long),
             "negative_items": torch.tensor(negative_items, dtype=torch.long),
-            "edge_index": session_edge_index,
+            "edge_index": edge_index,
         }
 
-    def _sample_negatives(self, session_items: list) -> list:
+    def _sample_negatives(self, session_items: np.ndarray) -> list:
         """Sample negative items.
 
         Args:
@@ -122,7 +123,7 @@ class SessionDataset(Dataset):
 
         return negatives
 
-    def _build_session_subgraph(self, context_items: list) -> torch.Tensor:
+    def _build_session_subgraph(self, context_items: np.ndarray) -> torch.Tensor:
         """Build session subgraph from context items.
 
         Args:
@@ -131,7 +132,6 @@ class SessionDataset(Dataset):
         Returns:
             Edge index [2, num_edges].
         """
-        # Filter edges to only include context items
         context_items_set = set(context_items)
 
         # Find edges where both item_i and item_j are in context
@@ -140,7 +140,6 @@ class SessionDataset(Dataset):
         ].isin(context_items_set)
 
         if mask.sum() == 0:
-            # No edges, return empty edge index
             return torch.zeros((2, 0), dtype=torch.long)
 
         # Get filtered edges
@@ -164,7 +163,6 @@ def collate_fn(batch: list[dict]) -> Batch:
     Returns:
         PyG Batch object.
     """
-    # Create PyG Data objects
     data_list = []
 
     for item in batch:
@@ -177,28 +175,31 @@ def collate_fn(batch: list[dict]) -> Batch:
 
         # Remap edge_index to local indices
         if edge_index.numel() > 0:
-            edge_index_local = torch.zeros_like(edge_index)
+            valid_edges = []
             for i in range(edge_index.shape[1]):
                 src_item = edge_index[0, i].item()
                 tgt_item = edge_index[1, i].item()
                 if src_item in item_to_idx and tgt_item in item_to_idx:
-                    edge_index_local[0, i] = item_to_idx[src_item]
-                    edge_index_local[1, i] = item_to_idx[tgt_item]
+                    valid_edges.append([item_to_idx[src_item], item_to_idx[tgt_item]])
+
+            if valid_edges:
+                edge_index_local = torch.tensor(valid_edges, dtype=torch.long).t()
+            else:
+                edge_index_local = torch.zeros((2, 0), dtype=torch.long)
         else:
             edge_index_local = edge_index
 
+        # Create Data object
         data = Data(
-            x=unique_items,  # Use unique items as node features
+            x=unique_items,
             edge_index=edge_index_local,
             target_item=item["target_item"],
             negative_items=item["negative_items"],
         )
+
         data_list.append(data)
 
-    # Batch into single graph
-    batched_data = Batch.from_data_list(data_list)
-
-    return batched_data
+    return Batch.from_data_list(data_list)
 
 
 def create_dataloader(
@@ -231,12 +232,10 @@ def create_dataloader(
         max_session_length=max_session_length,
     )
 
-    dataloader = torch.utils.data.DataLoader(
+    return torch.utils.data.DataLoader(
         dataset,
         batch_size=batch_size,
         shuffle=shuffle,
         num_workers=num_workers,
         collate_fn=collate_fn,
     )
-
-    return dataloader

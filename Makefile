@@ -1,4 +1,5 @@
-.PHONY: help setup fmt lint typecheck test data baseline train ablate export serve-local \
+.PHONY: help setup fmt lint typecheck test test-cov smoke-test ablate ci-local \
+        data baseline train export pipeline mlflow-run onnx-export \
         docker-train-build docker-train-push gcp-validate gcp-bootstrap gcp-train \
         docker-infer-build docker-infer-push gcp-deploy gcp-smoke clean
 
@@ -15,14 +16,21 @@ help:
 	@echo "  make lint               - Lint code with ruff"
 	@echo "  make typecheck          - Type check with mypy"
 	@echo "  make test               - Run tests with pytest"
+	@echo "  make test-cov           - Run tests with coverage (60% threshold)"
+	@echo "  make smoke-test         - Run smoke tests for all model variants"
+	@echo "  make ablate             - Run ablation study tests"
+	@echo "  make ci-local           - Run full CI locally (lint + typecheck + test)"
 	@echo ""
 	@echo "Data & Training (Local):"
 	@echo "  make data               - Prepare RetailRocket dataset"
 	@echo "  make baseline           - Train baseline models locally"
-	@echo "  make train              - Train ETP-GT locally"
-	@echo "  make ablate             - Run ablation studies"
+	@echo "  make train              - Train Graph Transformer locally"
 	@echo "  make export             - Export embeddings"
-	@echo "  make serve-local        - Run inference API locally"
+	@echo ""
+	@echo "ML Pipeline:"
+	@echo "  make pipeline           - Run full pipeline (validate all models with real data)"
+	@echo "  make mlflow-run         - Run training with MLflow tracking"
+	@echo "  make onnx-export        - Export model to ONNX format"
 	@echo ""
 	@echo "Docker & GCP:"
 	@echo "  make docker-train-build - Build training Docker image"
@@ -57,23 +65,39 @@ typecheck:
 test:
 	.venv/bin/pytest tests/ -v
 
+test-cov:
+	.venv/bin/pytest tests/ -v --cov=etpgt --cov-report=term-missing --cov-fail-under=60
+
+smoke-test:
+	.venv/bin/python scripts/smoke_test_all_models.py --device cpu
+
+ablate:
+	.venv/bin/pytest tests/test_ablations.py -v
+
+ci-local:
+	$(MAKE) lint && $(MAKE) typecheck && $(MAKE) test-cov
+
 data:
 	.venv/bin/python scripts/prep_retailrocket.py
 
 baseline:
-	.venv/bin/python -m etpgt.cli.train --config configs/yoochoose_baselines.yaml
+	.venv/bin/python scripts/train/train_baseline.py --model graphsage
 
 train:
-	.venv/bin/python -m etpgt.cli.train --config configs/yoochoose_etpgt_small.yaml
-
-ablate:
-	.venv/bin/python -m etpgt.cli.ablate --config configs/ablations.yaml
+	.venv/bin/python scripts/train/train_baseline.py --model graph_transformer_optimized
 
 export:
 	.venv/bin/python scripts/export_embeddings.py
 
-serve-local:
-	.venv/bin/uvicorn etpgt.serve.rerank_api:app --host 0.0.0.0 --port 8000 --reload
+# ML Pipeline
+pipeline:
+	.venv/bin/python scripts/pipeline/run_full_pipeline.py --num-sessions 100 --num-epochs 3
+
+mlflow-run:
+	.venv/bin/python scripts/pipeline/mlflow_experiment.py --model $(MODEL) --epochs 5
+
+onnx-export:
+	.venv/bin/python scripts/pipeline/export_onnx.py --demo
 
 # Docker - Training
 docker-train-build:

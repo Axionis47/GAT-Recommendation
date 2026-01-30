@@ -1,0 +1,5 @@
+project_id  = "plotpointe"
+region      = "us-central1"
+bucket_name = "plotpointe-etpgt-data"
+ar_repo     = "etpgt"
+sa_name     = "etpgt-sa"

@@ -25,10 +25,24 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
+[project.optional-dependencies]
+serve = [
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "isort>=5.12",
+    "ruff>=0.1.0",
+    "mypy>=1.5",
+]
+
 [project.urls]
-Homepage = "https://github.com/<org>/etp-gt"
-Repository = "https://github.com/<org>/etp-gt"
-Documentation = "https://github.com/<org>/etp-gt/tree/main/docs"
+Homepage = "https://github.com/Axionis47/GAT-Recommendation"
+Repository = "https://github.com/Axionis47/GAT-Recommendation"
+Documentation = "https://github.com/Axionis47/GAT-Recommendation/tree/main/docs"
 
 [tool.black]
 line-length = 100
@@ -139,6 +153,10 @@ markers = [
     "integration: marks tests as integration tests",
     "gcp: marks tests that require GCP credentials",
 ]
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101"]
 
 [tool.coverage.run]
 source = ["etpgt"]

@@ -4,11 +4,14 @@
 
 set -e
 
-# Configuration
-PROJECT_ID="plotpointe"
-REGION="us-central1"
-BUCKET_NAME="plotpointe-etpgt-data"
-IMAGE_URI="us-central1-docker.pkg.dev/${PROJECT_ID}/etpgt/etpgt-train:latest"
+# Configuration - Set these environment variables before running:
+# export GCP_PROJECT_ID="your-project-id"
+# export GCS_BUCKET="your-bucket-name"
+# export GCP_REGION="us-central1"  # optional, defaults to us-central1
+PROJECT_ID="${GCP_PROJECT_ID:?Error: GCP_PROJECT_ID environment variable is not set}"
+REGION="${GCP_REGION:-us-central1}"
+BUCKET_NAME="${GCS_BUCKET:?Error: GCS_BUCKET environment variable is not set}"
+IMAGE_URI="${GCP_REGION:-us-central1}-docker.pkg.dev/${PROJECT_ID}/etpgt/etpgt-train:latest"
 JOB_NAME="etpgt-graph_transformer_optimized-$(date +%Y%m%d-%H%M%S)"
 
 # Model configuration (OPTIMIZED)
@@ -101,7 +104,7 @@ gcloud ai custom-jobs create \
   --args="--weight-decay=${WEIGHT_DECAY}" \
   --enable-web-access \
   --enable-dashboard-access \
-  --service-account="etpgt-sa@${PROJECT_ID}.iam.gserviceaccount.com"
+  --service-account="${GCP_SERVICE_ACCOUNT:-etpgt-sa@${PROJECT_ID}.iam.gserviceaccount.com}"
 
 echo ""
 echo "=========================================="
