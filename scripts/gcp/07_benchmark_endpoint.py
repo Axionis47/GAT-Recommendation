@@ -17,12 +17,8 @@ import statistics
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
 
 import numpy as np
-
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 
 def generate_test_sessions(
@@ -250,14 +246,14 @@ def main():
         print("\n" + "=" * 60)
         print("BENCHMARK RESULTS")
         print("=" * 60)
-        print(f"\nLatency:")
+        print("\nLatency:")
         print(f"  P50:  {metrics.get('latency_p50_ms', 'N/A')} ms")
         print(f"  P90:  {metrics.get('latency_p90_ms', 'N/A')} ms")
         print(f"  P95:  {metrics.get('latency_p95_ms', 'N/A')} ms")
         print(f"  P99:  {metrics.get('latency_p99_ms', 'N/A')} ms")
         print(f"  Mean: {metrics.get('latency_mean_ms', 'N/A')} ms")
 
-        print(f"\nThroughput:")
+        print("\nThroughput:")
         print(f"  Requests/sec: {metrics.get('throughput_rps', 'N/A')}")
         print(f"  Error rate:   {metrics.get('error_rate_pct', 'N/A')}%")
 

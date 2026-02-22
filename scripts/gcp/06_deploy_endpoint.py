@@ -22,10 +22,6 @@ Usage:
 
 import argparse
 import sys
-from pathlib import Path
-
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 
 def create_endpoint(
@@ -109,7 +105,7 @@ def deploy_model(
         traffic_percentage=traffic_percentage,
     )
 
-    print(f"Model deployed successfully!")
+    print("Model deployed successfully!")
     return endpoint
 
 
@@ -156,7 +152,7 @@ def deploy_ab_test(
 
     # Deploy PyTorch model first with 100% traffic (required for first model)
     print(f"\n{'='*60}")
-    print(f"Deploying PyTorch model (initially 100% traffic)")
+    print("Deploying PyTorch model (initially 100% traffic)")
     print(f"{'='*60}")
 
     deploy_model(
@@ -190,11 +186,11 @@ def deploy_ab_test(
     print(f"{'='*60}")
     print(f"Endpoint:      {endpoint.resource_name}")
     print(f"Traffic split: PyTorch={pytorch_traffic}%, ONNX={onnx_traffic}%")
-    print(f"\nTest the endpoint:")
+    print("\nTest the endpoint:")
     print(f"  curl -X POST '{region}-aiplatform.googleapis.com/v1/{endpoint.resource_name}:predict' \\")
-    print(f'    -H "Authorization: Bearer $(gcloud auth print-access-token)" \\')
-    print(f'    -H "Content-Type: application/json" \\')
-    print(f"    -d '{{\"instances\": [{{\"session_items\": [1,2,3], \"k\": 10}}]}}'")
+    print('    -H "Authorization: Bearer $(gcloud auth print-access-token)" \\')
+    print('    -H "Content-Type: application/json" \\')
+    print("    -d '{\"instances\": [{\"session_items\": [1,2,3], \"k\": 10}]}'")
     print(f"{'='*60}")
 
     return endpoint

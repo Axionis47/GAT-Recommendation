@@ -14,14 +14,9 @@ Usage:
         -d '{"session_items": [1, 2, 3], "k": 10}'
 """
 
-import sys
 import time
 from pathlib import Path
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
-import numpy as np
 import torch
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel

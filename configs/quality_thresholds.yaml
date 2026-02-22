@@ -1,0 +1,20 @@
+# Model quality gate thresholds
+# A model must meet ALL thresholds to pass the quality gate.
+# Thresholds set at ~80% of current production baseline (Recall@10: 0.3828, NDCG@10: 0.3065)
+
+quality_gate:
+  metrics:
+    recall_at_10: 0.30
+    recall_at_20: 0.35
+    ndcg_at_10: 0.25
+    ndcg_at_20: 0.28
+
+  model_checks:
+    max_size_mb: 2000
+    min_size_mb: 0.1
+    nan_check: true
+
+  latency_slo:
+    p50_ms: 100
+    p95_ms: 500
+    p99_ms: 1000

@@ -99,6 +99,14 @@ yarn.lock
 # Docker
 .dockerignore
 
+# Generated artifacts
+mlflow.db
+evaluation_results.json
+exports/
+data/test_subset/
+*.lock
+checkpoints/
+
 # Temporary files
 tmp/
 temp/

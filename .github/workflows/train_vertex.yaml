@@ -1,8 +1,7 @@
-name: Train on Vertex AI (Disabled)
+name: Train on Vertex AI
 
 on:
   workflow_dispatch:
-  # Disabled until GCP secrets are configured
     inputs:
       config_path:
         description: 'GCS path to config file (e.g., gs://bucket/configs/model.yaml)'
@@ -50,7 +49,7 @@ jobs:
 
       - name: Build and push training image
         run: |
-          docker build -f docker/Dockerfile.train \
+          docker build -f docker/train.Dockerfile \
             -t ${{ env.AR_REPO }}/train:${{ inputs.image_tag }} \
             -t ${{ env.AR_REPO }}/train:${{ github.sha }} .
           docker push ${{ env.AR_REPO }}/train:${{ inputs.image_tag }}
@@ -66,16 +65,55 @@ jobs:
             --image-tag ${{ inputs.image_tag }}
           echo "job_name=${JOB_NAME}" >> $GITHUB_OUTPUT
 
+      - name: Wait for training completion
+        id: wait_training
+        run: |
+          JOB_NAME="${{ steps.vertex_job.outputs.job_name }}"
+          echo "Polling for job completion: ${JOB_NAME}"
+          for i in $(seq 1 360); do
+            STATE=$(gcloud ai custom-jobs list \
+              --region=${{ env.GCP_REGION }} \
+              --filter="displayName=${JOB_NAME}" \
+              --format="value(state)" | head -1)
+            echo "Attempt ${i}: State = ${STATE}"
+            if [ "${STATE}" = "JOB_STATE_SUCCEEDED" ]; then
+              echo "status=success" >> $GITHUB_OUTPUT
+              exit 0
+            elif [ "${STATE}" = "JOB_STATE_FAILED" ] || [ "${STATE}" = "JOB_STATE_CANCELLED" ]; then
+              echo "status=failed" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+            sleep 60
+          done
+          echo "status=timeout" >> $GITHUB_OUTPUT
+          exit 1
+        timeout-minutes: 360
+
+      - name: Download training artifacts
+        if: steps.wait_training.outputs.status == 'success'
+        run: |
+          mkdir -p artifacts
+          gsutil -m cp -r \
+            "gs://${{ env.GCS_BUCKET }}/models/checkpoints/${{ steps.vertex_job.outputs.job_name }}/*" \
+            artifacts/ || echo "Warning: Some artifacts not found"
+
+      - name: Upload training artifacts
+        if: steps.wait_training.outputs.status == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: training-artifacts-${{ steps.vertex_job.outputs.job_name }}
+          path: artifacts/
+          retention-days: 30
+
       - name: Job Summary
+        if: always()
         run: |
           echo "## Vertex AI Training Job" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Job Name**: ${{ steps.vertex_job.outputs.job_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ steps.wait_training.outputs.status || 'submitted' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Config**: ${{ inputs.config_path }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Image**: ${{ env.AR_REPO }}/train:${{ inputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "View job in [Vertex AI Console](https://console.cloud.google.com/vertex-ai/training/custom-jobs?project=${{ env.GCP_PROJECT_ID }})" >> $GITHUB_STEP_SUMMARY
-
-      # TODO: Add step to download and upload metrics as artifact once job completes
-

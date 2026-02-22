@@ -125,11 +125,11 @@ module = [
     "torch_geometric.*",
     "torch_scatter.*",
     "torch_sparse.*",
-    "faiss.*",
-    "wandb.*",
-    "networkx.*",
     "scipy.*",
     "sklearn.*",
+    "mlflow.*",
+    "onnx.*",
+    "onnxruntime.*",
 ]
 ignore_missing_imports = true
 

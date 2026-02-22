@@ -24,11 +24,7 @@ import argparse
 import json
 import sys
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from datetime import UTC, datetime, timedelta
 
 
 def query_endpoint_logs(
@@ -51,7 +47,7 @@ def query_endpoint_logs(
     client = cloud_logging.Client(project=project_id)
 
     # Calculate time filter
-    end_time = datetime.now(timezone.utc)
+    end_time = datetime.now(UTC)
     start_time = end_time - timedelta(hours=hours)
 
     # Build filter
@@ -116,7 +112,7 @@ def parse_latency_from_logs(entries: list) -> dict:
                 if status and status >= 400:
                     results[deployed_model_id]["errors"] += 1
 
-        except Exception as e:
+        except Exception:
             continue
 
     return dict(results)
@@ -265,7 +261,7 @@ def generate_recommendation(results: dict, stats_test: dict) -> str:
     error_b = results[model_b]["error_rate_pct"]
 
     recommendation = []
-    recommendation.append(f"## Recommendation")
+    recommendation.append("## Recommendation")
     recommendation.append("")
 
     if stats_test.get("significant"):
@@ -390,7 +386,7 @@ def main():
             output_data = {
                 "endpoint_id": args.endpoint_id,
                 "analysis_period_hours": args.hours,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "models": {
                     model_id: {
                         "display_name": data["display_name"],

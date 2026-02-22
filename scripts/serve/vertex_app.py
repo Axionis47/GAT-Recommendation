@@ -6,6 +6,8 @@ This server adapts the recommendation API for Vertex AI custom containers:
 - Predictions at /predict (AIP_PREDICT_ROUTE)
 - Loads model from GCS or local path
 - Supports both PyTorch and ONNX inference modes
+- Includes OpenTelemetry distributed tracing
+- Includes Evidently-based drift detection
 
 Usage:
     # Local testing
@@ -20,23 +22,58 @@ Usage:
 import json
 import logging
 import os
-import sys
 import time
 import traceback
+import uuid
+from collections import Counter
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
-from prometheus_client import Counter, Gauge, Histogram, generate_latest
+from prometheus_client import Counter as PromCounter
+from prometheus_client import Gauge, Histogram, generate_latest
 from pydantic import BaseModel
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# OpenTelemetry tracing setup
+# ---------------------------------------------------------------------------
+
+
+def setup_tracing():
+    """Initialize OpenTelemetry with Google Cloud Trace exporter."""
+    try:
+        from opentelemetry import trace
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+        provider = TracerProvider()
+        try:
+            from opentelemetry.exporter.cloud_trace import CloudTraceSpanExporter
+
+            exporter = CloudTraceSpanExporter()
+            provider.add_span_processor(BatchSpanProcessor(exporter))
+            logger.info("OpenTelemetry: Google Cloud Trace exporter configured")
+        except Exception as e:
+            logger.warning("OpenTelemetry: Cloud Trace unavailable (%s), using no-op", e)
+
+        trace.set_tracer_provider(provider)
+        return trace.get_tracer("gat-recommendation")
+    except ImportError:
+        logger.warning("OpenTelemetry not installed, tracing disabled")
+        return None
+
+
+tracer = setup_tracing()
+
+# ---------------------------------------------------------------------------
 # Prometheus metrics
-REQUEST_COUNT = Counter(
+# ---------------------------------------------------------------------------
+
+REQUEST_COUNT = PromCounter(
     "prediction_requests_total",
     "Total prediction requests",
     ["endpoint", "status"],
@@ -50,10 +87,18 @@ REQUEST_LATENCY = Histogram(
 MODEL_LOADED = Gauge("model_loaded", "Whether the model is loaded (1=yes, 0=no)")
 MODEL_ITEMS = Gauge("model_num_items", "Number of items in the loaded model")
 
+# Drift detection metrics
+PREDICTION_SCORE_MEAN = Gauge("prediction_score_mean", "Rolling mean of top prediction scores")
+PREDICTION_SCORE_STD = Gauge("prediction_score_std", "Rolling std of top prediction scores")
+SESSION_LENGTH_MEAN = Gauge("session_length_mean", "Rolling mean session length")
+TOP_ITEM_ENTROPY = Gauge("top_item_entropy", "Entropy of top-1 recommended items (diversity)")
+DRIFT_DETECTED = Gauge("drift_detected", "Whether distribution drift is detected (1=yes)")
+
 # Configuration from environment
 PORT = int(os.getenv("PORT", "8080"))
 INFERENCE_MODE = os.getenv("INFERENCE_MODE", "pytorch")  # "pytorch" or "onnx"
 GCS_MODEL_URI = os.getenv("GCS_MODEL_URI", "")  # e.g., gs://bucket/models/v1/
+
 
 # Vertex AI sets AIP_STORAGE_URI to the GCS path of artifact_uri contents
 AIP_STORAGE_URI = os.getenv("AIP_STORAGE_URI", "")
@@ -67,7 +112,11 @@ EMBEDDINGS_PATH = os.getenv("EMBEDDINGS_PATH", "/app/model/item_embeddings.npy")
 GCS_ARTIFACT_SOURCE = AIP_STORAGE_URI.rstrip("/") if AIP_STORAGE_URI else GCS_MODEL_URI.rstrip("/") if GCS_MODEL_URI else ""
 
 
-# Vertex AI prediction format
+# ---------------------------------------------------------------------------
+# Request/Response models
+# ---------------------------------------------------------------------------
+
+
 class VertexInstance(BaseModel):
     """Single prediction instance."""
 
@@ -79,17 +128,17 @@ class VertexPredictRequest(BaseModel):
     """Vertex AI prediction request format."""
 
     instances: list[dict]  # Each instance: {"session_items": [1,2,3], "k": 10}
-    parameters: Optional[dict] = None
+    parameters: dict | None = None
 
 
 class VertexPredictResponse(BaseModel):
     """Vertex AI prediction response format."""
 
     predictions: list[dict]
-    deployedModelId: Optional[str] = None
-    model: Optional[str] = None
-    modelDisplayName: Optional[str] = None
-    modelVersionId: Optional[str] = None
+    deployedModelId: str | None = None
+    model: str | None = None
+    modelDisplayName: str | None = None
+    modelVersionId: str | None = None
 
 
 class HealthResponse(BaseModel):
@@ -117,7 +166,11 @@ class RecommendResponse(BaseModel):
     latency_ms: float
 
 
-# Global model state
+# ---------------------------------------------------------------------------
+# Model state
+# ---------------------------------------------------------------------------
+
+
 class ModelState:
     """Holds loaded model and embeddings."""
 
@@ -133,12 +186,118 @@ class ModelState:
 
 state = ModelState()
 
+
+# ---------------------------------------------------------------------------
+# Drift detection
+# ---------------------------------------------------------------------------
+
+
+class DriftDetector:
+    """Production drift detection using Evidently.
+
+    Collects prediction statistics in a rolling window and compares
+    against a reference window (first N requests) to detect distribution
+    drift in prediction scores and session lengths.
+    """
+
+    def __init__(self, window_size: int = 1000, reference_size: int = 5000):
+        self.window_size = window_size
+        self.reference_size = reference_size
+        self.score_buffer: list[float] = []
+        self.session_length_buffer: list[int] = []
+        self.top_item_buffer: list[int] = []
+        self.reference_scores: list[float] | None = None
+        self.reference_session_lengths: list[int] | None = None
+
+    def record(self, session_length: int, top_score: float, top_item: int):
+        """Record a single prediction for drift monitoring."""
+        self.score_buffer.append(top_score)
+        self.session_length_buffer.append(session_length)
+        self.top_item_buffer.append(top_item)
+
+        # Set reference window from first N requests
+        if self.reference_scores is None and len(self.score_buffer) >= self.reference_size:
+            self.reference_scores = list(self.score_buffer)
+            self.reference_session_lengths = list(self.session_length_buffer)
+
+        # Keep only recent window + reference
+        max_buffer = self.window_size + self.reference_size
+        if len(self.score_buffer) > max_buffer:
+            self.score_buffer = self.score_buffer[-self.window_size:]
+            self.session_length_buffer = self.session_length_buffer[-self.window_size:]
+            self.top_item_buffer = self.top_item_buffer[-self.window_size:]
+
+    def check_drift(self) -> dict:
+        """Run Evidently drift detection on current vs reference window."""
+        if self.reference_scores is None or len(self.score_buffer) < self.window_size:
+            return {"drift_detected": False, "reason": "insufficient_data"}
+
+        try:
+            import pandas as pd
+            from evidently.metric_preset import DataDriftPreset
+            from evidently.report import Report
+
+            ref_df = pd.DataFrame({
+                "score": self.reference_scores[:self.window_size],
+                "session_length": self.reference_session_lengths[:self.window_size],
+            })
+            cur_df = pd.DataFrame({
+                "score": self.score_buffer[-self.window_size:],
+                "session_length": self.session_length_buffer[-self.window_size:],
+            })
+
+            report = Report(metrics=[DataDriftPreset()])
+            report.run(reference_data=ref_df, current_data=cur_df)
+            result = report.as_dict()
+            drifted = result["metrics"][0]["result"]["dataset_drift"]
+            return {"drift_detected": drifted, "details": result}
+        except ImportError:
+            logger.warning("Evidently not installed, drift detection unavailable")
+            return {"drift_detected": False, "error": "evidently_not_installed"}
+        except Exception as e:
+            logger.warning("Drift check failed: %s", e)
+            return {"drift_detected": False, "error": str(e)}
+
+    def update_metrics(self):
+        """Push rolling stats to Prometheus gauges."""
+        window = self.window_size
+
+        if self.score_buffer:
+            recent_scores = self.score_buffer[-window:]
+            PREDICTION_SCORE_MEAN.set(float(np.mean(recent_scores)))
+            PREDICTION_SCORE_STD.set(float(np.std(recent_scores)))
+
+        if self.session_length_buffer:
+            recent_lengths = self.session_length_buffer[-window:]
+            SESSION_LENGTH_MEAN.set(float(np.mean(recent_lengths)))
+
+        if self.top_item_buffer:
+            counts = Counter(self.top_item_buffer[-window:])
+            total = sum(counts.values())
+            entropy = -sum((c / total) * np.log(c / total + 1e-10) for c in counts.values())
+            TOP_ITEM_ENTROPY.set(float(entropy))
+
+        drift_result = self.check_drift()
+        DRIFT_DETECTED.set(1 if drift_result.get("drift_detected", False) else 0)
+
+
+drift_detector = DriftDetector(window_size=1000, reference_size=5000)
+
+
+# ---------------------------------------------------------------------------
 # FastAPI app
+# ---------------------------------------------------------------------------
+
 app = FastAPI(
     title="GAT-Recommendation Vertex AI Endpoint",
     description="Session-based recommendation using Graph Neural Networks",
     version="1.0.0",
 )
+
+
+# ---------------------------------------------------------------------------
+# GCS download
+# ---------------------------------------------------------------------------
 
 
 def download_from_gcs(gcs_uri: str, local_path: str) -> bool:
@@ -175,13 +334,14 @@ def download_from_gcs(gcs_uri: str, local_path: str) -> bool:
         return False
 
 
+# ---------------------------------------------------------------------------
+# Model loading
+# ---------------------------------------------------------------------------
+
+
 def load_pytorch_model():
     """Load PyTorch model for inference."""
     import torch
-
-    # Add project root to path for imports
-    project_root = Path(__file__).parent.parent.parent
-    sys.path.insert(0, str(project_root))
 
     from etpgt.model import create_graph_transformer_optimized
 
@@ -264,6 +424,11 @@ def load_onnx_model():
     logger.info("ONNX model loaded: %d items, %dd embeddings", state.num_items, state.embedding_dim)
 
 
+# ---------------------------------------------------------------------------
+# Startup
+# ---------------------------------------------------------------------------
+
+
 @app.on_event("startup")
 async def startup():
     """Load model on startup."""
@@ -299,6 +464,22 @@ async def startup():
         logger.error("[STARTUP] Failed to load model: %s\n%s", e, traceback.format_exc())
         # Don't raise - let health check report not ready (503)
 
+    # Initialize OpenTelemetry FastAPI auto-instrumentation
+    try:
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+        FastAPIInstrumentor.instrument_app(app)
+        logger.info("OpenTelemetry: FastAPI auto-instrumentation enabled")
+    except ImportError:
+        logger.warning("OpenTelemetry: FastAPI instrumentation not available")
+    except Exception as e:
+        logger.warning("OpenTelemetry: FastAPI instrumentation failed: %s", e)
+
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
+
 
 @app.get("/health", response_model=HealthResponse)
 async def health():
@@ -326,6 +507,22 @@ async def metrics():
     return Response(content=generate_latest(), media_type="text/plain; version=0.0.4")
 
 
+@app.get("/drift")
+async def drift_status():
+    """Drift detection status endpoint.
+
+    Returns current drift detection results from Evidently analysis.
+    Updates Prometheus drift metrics as a side effect.
+    """
+    drift_detector.update_metrics()
+    return drift_detector.check_drift()
+
+
+# ---------------------------------------------------------------------------
+# Inference
+# ---------------------------------------------------------------------------
+
+
 def compute_recommendations(session_items: list[int], k: int = 10) -> dict:
     """Compute recommendations for a session.
 
@@ -343,36 +540,60 @@ def compute_recommendations(session_items: list[int], k: int = 10) -> dict:
     if not valid_items:
         raise ValueError("No valid item IDs in session")
 
-    # Compute session embedding (mean of item embeddings)
-    session_embedding = state.item_embeddings[valid_items].mean(axis=0, keepdims=True)
+    # Optionally wrap in OpenTelemetry span
+    span = None
+    if tracer is not None:
+        from opentelemetry import trace as otel_trace
 
-    # Normalize for cosine similarity
-    session_norm = session_embedding / (
-        np.linalg.norm(session_embedding, axis=-1, keepdims=True) + 1e-8
-    )
-    item_norm = state.item_embeddings / (
-        np.linalg.norm(state.item_embeddings, axis=-1, keepdims=True) + 1e-8
-    )
+        span = tracer.start_span("compute_recommendations")
+        span.set_attribute("session.length", len(session_items))
+        span.set_attribute("session.valid_items", len(valid_items))
+        span.set_attribute("recommendation.k", k)
 
-    # Compute cosine similarity scores
-    scores = np.matmul(session_norm, item_norm.T).squeeze(0)
+    try:
+        # Compute session embedding (mean of item embeddings)
+        session_embedding = state.item_embeddings[valid_items].mean(axis=0, keepdims=True)
 
-    # Exclude items already in session
-    for item_id in valid_items:
-        scores[item_id] = float("-inf")
+        # Normalize for cosine similarity
+        session_norm = session_embedding / (
+            np.linalg.norm(session_embedding, axis=-1, keepdims=True) + 1e-8
+        )
+        item_norm = state.item_embeddings / (
+            np.linalg.norm(state.item_embeddings, axis=-1, keepdims=True) + 1e-8
+        )
 
-    # Get top-k recommendations
-    k = min(k, state.num_items - len(valid_items))
-    top_indices = np.argsort(scores)[-k:][::-1]
-    top_scores = scores[top_indices]
+        # Compute cosine similarity scores
+        scores = np.matmul(session_norm, item_norm.T).squeeze(0)
 
-    latency_ms = (time.time() - start_time) * 1000
+        # Exclude items already in session
+        for item_id in valid_items:
+            scores[item_id] = float("-inf")
 
-    return {
-        "recommendations": top_indices.tolist(),
-        "scores": top_scores.tolist(),
-        "latency_ms": round(latency_ms, 3),
-    }
+        # Get top-k recommendations
+        k = min(k, state.num_items - len(valid_items))
+        top_indices = np.argsort(scores)[-k:][::-1]
+        top_scores = scores[top_indices]
+
+        latency_ms = (time.time() - start_time) * 1000
+
+        # Record for drift detection
+        drift_detector.record(
+            session_length=len(valid_items),
+            top_score=float(top_scores[0]),
+            top_item=int(top_indices[0]),
+        )
+
+        if span is not None:
+            span.set_attribute("recommendation.latency_ms", latency_ms)
+
+        return {
+            "recommendations": top_indices.tolist(),
+            "scores": top_scores.tolist(),
+            "latency_ms": round(latency_ms, 3),
+        }
+    finally:
+        if span is not None:
+            span.end()
 
 
 @app.post("/predict", response_model=VertexPredictResponse)
@@ -384,6 +605,7 @@ async def predict(request: VertexPredictRequest):
     if not state.loaded:
         raise HTTPException(status_code=503, detail="Model not loaded")
 
+    request_id = str(uuid.uuid4())[:8]
     start = time.time()
     predictions = []
     for instance in request.instances:
@@ -392,11 +614,12 @@ async def predict(request: VertexPredictRequest):
 
         try:
             result = compute_recommendations(session_items, k)
+            result["request_id"] = request_id
             predictions.append(result)
         except ValueError as e:
-            predictions.append({"error": str(e)})
+            predictions.append({"error": str(e), "request_id": request_id})
         except Exception as e:
-            predictions.append({"error": f"Inference failed: {str(e)}"})
+            predictions.append({"error": f"Inference failed: {str(e)}", "request_id": request_id})
 
     latency = time.time() - start
     REQUEST_LATENCY.labels(endpoint="/predict").observe(latency)

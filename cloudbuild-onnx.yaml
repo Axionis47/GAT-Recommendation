@@ -5,9 +5,9 @@ steps:
       - '-f'
       - 'docker/serve-onnx.Dockerfile'
       - '-t'
-      - 'us-central1-docker.pkg.dev/plotpointe/etpgt/etpgt-serve-onnx:v6'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/etpgt/etpgt-serve-onnx:v6'
       - '-t'
-      - 'us-central1-docker.pkg.dev/plotpointe/etpgt/etpgt-serve-onnx:latest'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/etpgt/etpgt-serve-onnx:latest'
       - '.'
   - name: 'aquasec/trivy:latest'
     args:
@@ -17,8 +17,8 @@ steps:
       - '--severity'
       - 'CRITICAL,HIGH'
       - '--ignore-unfixed'
-      - 'us-central1-docker.pkg.dev/plotpointe/etpgt/etpgt-serve-onnx:v6'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/etpgt/etpgt-serve-onnx:v6'
 images:
-  - 'us-central1-docker.pkg.dev/plotpointe/etpgt/etpgt-serve-onnx:v6'
-  - 'us-central1-docker.pkg.dev/plotpointe/etpgt/etpgt-serve-onnx:latest'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/etpgt/etpgt-serve-onnx:v6'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/etpgt/etpgt-serve-onnx:latest'
 timeout: '1200s'

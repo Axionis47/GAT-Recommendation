@@ -10,9 +10,15 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install
-COPY requirements-serve-onnx.txt .
-RUN pip install --no-cache-dir -r requirements-serve-onnx.txt
+# Copy requirements (lock file for reproducible builds, fallback to unpinned)
+COPY requirements-serve-onnx.lock* requirements-serve-onnx.txt ./
+
+# Install Python dependencies (prefer lock file if available)
+RUN if [ -f requirements-serve-onnx.lock ]; then \
+        pip install --no-cache-dir -r requirements-serve-onnx.lock; \
+    else \
+        pip install --no-cache-dir -r requirements-serve-onnx.txt; \
+    fi
 
 # Copy minimal package for inference
 COPY etpgt/__init__.py etpgt/

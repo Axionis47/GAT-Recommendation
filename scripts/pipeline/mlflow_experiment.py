@@ -11,16 +11,12 @@ Usage:
 """
 
 import argparse
-import json
 import sys
 import time
 from pathlib import Path
 
-import torch
 import pandas as pd
-
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+import torch
 
 try:
     import mlflow
@@ -31,14 +27,12 @@ except ImportError:
     print("WARNING: MLflow not installed. Run: pip install mlflow")
 
 from etpgt.model import (
-    create_etpgt,
     create_gat,
     create_graph_transformer,
     create_graph_transformer_optimized,
     create_graphsage,
 )
 from etpgt.train.losses import create_loss_function
-
 
 # Model registry
 MODEL_REGISTRY = {
@@ -61,11 +55,6 @@ MODEL_REGISTRY = {
         "create_fn": create_graph_transformer_optimized,
         "description": "Optimized Graph Transformer without FFN",
         "training_notes": "88x faster than full, <3% accuracy loss",
-    },
-    "etpgt": {
-        "create_fn": create_etpgt,
-        "description": "ETPGT with temporal and path attention",
-        "training_notes": "Custom attention mechanism, experimental",
     },
 }
 
@@ -187,14 +176,12 @@ def train_with_mlflow(
         # GraphSAGE doesn't use num_heads
         if model_name == "graphsage":
             model_config.pop("num_heads", None)
-        elif model_name in ["gat", "graph_transformer", "graph_transformer_optimized", "etpgt"]:
+        elif model_name in ["gat", "graph_transformer", "graph_transformer_optimized"]:
             model_config.setdefault("num_heads", 2)
 
         # Add model-specific options
-        if model_name in ["graph_transformer", "graph_transformer_optimized", "etpgt"]:
+        if model_name in ["graph_transformer", "graph_transformer_optimized"]:
             model_config["use_laplacian_pe"] = False
-        if model_name == "etpgt":
-            model_config["use_cls_token"] = False
 
         model = create_fn(**model_config)
 

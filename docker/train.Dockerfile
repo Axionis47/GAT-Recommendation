@@ -11,11 +11,15 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
-COPY requirements.txt .
+# Copy requirements (lock file for reproducible builds, fallback to unpinned)
+COPY requirements.lock* requirements.txt ./
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies (prefer lock file if available)
+RUN if [ -f requirements.lock ]; then \
+        pip install --no-cache-dir -r requirements.lock; \
+    else \
+        pip install --no-cache-dir -r requirements.txt; \
+    fi
 
 # Install PyTorch Geometric dependencies
 RUN pip install --no-cache-dir \
@@ -38,8 +42,16 @@ COPY README.md .
 # Install package
 RUN pip install --no-cache-dir -e .
 
+# Run as non-root user for security
+RUN useradd -m -r trainuser && \
+    chown -R trainuser:trainuser /app
+USER trainuser
+
+# Health check (no HTTP server, so validate Python + torch import)
+HEALTHCHECK --interval=60s --timeout=10s --start-period=120s --retries=3 \
+    CMD python -c "import torch; print('healthy')" || exit 1
+
 # Default entrypoint (can be overridden)
 # For baselines: python scripts/train/train_baseline.py
-# For ETP-GT: python scripts/train/train_etpgt.py
 ENTRYPOINT ["python"]
 

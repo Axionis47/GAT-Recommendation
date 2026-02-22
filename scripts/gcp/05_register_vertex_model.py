@@ -15,12 +15,7 @@ Usage:
 """
 
 import argparse
-import os
 import sys
-from pathlib import Path
-
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 
 def register_model(
@@ -138,8 +133,8 @@ def main():
             description=args.description,
         )
 
-        print(f"\nNext step: Deploy to endpoint")
-        print(f"  python scripts/gcp/06_deploy_endpoint.py \\")
+        print("\nNext step: Deploy to endpoint")
+        print("  python scripts/gcp/06_deploy_endpoint.py \\")
         print(f"      --project-id {args.project_id} \\")
         print(f"      --region {args.region} \\")
         print(f"      --model-id {model.resource_name}")

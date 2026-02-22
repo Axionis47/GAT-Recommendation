@@ -40,6 +40,13 @@ ablations:
       model:
         use_cls_token: false
 
+  - name: no_ffn
+    description: Disable feed-forward network layers in transformer (29x speedup)
+    overrides:
+      model:
+        use_ffn: false
+        ffn_expansion: 2
+
 # Output
 output:
   results_path: gs://<bucket>/artifacts/ablations/ablations.csv

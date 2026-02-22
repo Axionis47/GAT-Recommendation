@@ -1,7 +1,7 @@
 .PHONY: help setup fmt lint typecheck test test-cov smoke-test ablate ci-local \
-        data baseline train export pipeline mlflow-run onnx-export \
+        data baseline train export pipeline mlflow-run onnx-export quality-gate \
         docker-train-build docker-train-push gcp-validate gcp-bootstrap gcp-train \
-        docker-infer-build docker-infer-push gcp-deploy gcp-smoke clean
+        docker-infer-build docker-infer-push gcp-deploy gcp-smoke dvc-init lock clean
 
 # Load environment variables (optional, ignore if not present)
 -include .env
@@ -22,15 +22,17 @@ help:
 	@echo "  make ci-local           - Run full CI locally (lint + typecheck + test)"
 	@echo ""
 	@echo "Data & Training (Local):"
-	@echo "  make data               - Prepare RetailRocket dataset"
+	@echo "  make data               - Run data pipeline (sessionize, split, build graph)"
 	@echo "  make baseline           - Train baseline models locally"
 	@echo "  make train              - Train Graph Transformer locally"
-	@echo "  make export             - Export embeddings"
+	@echo "  make export             - Export model to ONNX format"
 	@echo ""
 	@echo "ML Pipeline:"
 	@echo "  make pipeline           - Run full pipeline (validate all models with real data)"
 	@echo "  make mlflow-run         - Run training with MLflow tracking"
 	@echo "  make onnx-export        - Export model to ONNX format"
+	@echo "  make quality-gate       - Run model quality gate (validate before deploy)"
+	@echo "  make dvc-init           - Initialize DVC with GCS remote"
 	@echo ""
 	@echo "Docker & GCP:"
 	@echo "  make docker-train-build - Build training Docker image"
@@ -78,7 +80,9 @@ ci-local:
 	$(MAKE) lint && $(MAKE) typecheck && $(MAKE) test-cov
 
 data:
-	.venv/bin/python scripts/prep_retailrocket.py
+	.venv/bin/python scripts/data/02_sessionize.py
+	.venv/bin/python scripts/data/03_temporal_split.py
+	.venv/bin/python scripts/data/04_build_graph.py
 
 baseline:
 	.venv/bin/python scripts/train/train_baseline.py --model graphsage
@@ -87,7 +91,7 @@ train:
 	.venv/bin/python scripts/train/train_baseline.py --model graph_transformer_optimized
 
 export:
-	.venv/bin/python scripts/export_embeddings.py
+	.venv/bin/python scripts/pipeline/export_onnx.py --demo
 
 # ML Pipeline
 pipeline:
@@ -98,6 +102,23 @@ mlflow-run:
 
 onnx-export:
 	.venv/bin/python scripts/pipeline/export_onnx.py --demo
+
+quality-gate:
+	.venv/bin/python scripts/pipeline/model_quality_gate.py \
+		--checkpoint checkpoints/graph_transformer_optimized_best.pt \
+		--config configs/quality_thresholds.yaml
+
+dvc-init:
+	.venv/bin/dvc init
+	.venv/bin/dvc remote add -d gcs gs://${GCS_BUCKET}/dvc
+	@echo "✓ DVC initialized. Run 'dvc repro' to execute the pipeline."
+
+# Dependency lock files
+lock:  ## Regenerate dependency lock files
+	.venv/bin/pip-compile requirements.txt -o requirements.lock --strip-extras
+	.venv/bin/pip-compile requirements-serve.txt -o requirements-serve.lock --strip-extras
+	.venv/bin/pip-compile requirements-serve-onnx.txt -o requirements-serve-onnx.lock --strip-extras
+	@echo "Lock files regenerated"
 
 # Docker - Training
 docker-train-build:

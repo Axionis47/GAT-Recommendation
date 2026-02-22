@@ -15,9 +15,6 @@ import sys
 import time
 from pathlib import Path
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
@@ -31,7 +28,6 @@ from etpgt.model import (
 )
 from etpgt.train.dataloader import SessionDataset, collate_fn
 from etpgt.utils.metrics import compute_ndcg_at_k, compute_recall_at_k
-
 
 # Model configurations (matching training)
 MODEL_CONFIGS = {
@@ -287,7 +283,7 @@ def main():
         }
 
         # Print results
-        print(f"\nResults:")
+        print("\nResults:")
         print(f"  Recall@10:  {metrics['recall@10']*100:.2f}%")
         print(f"  Recall@20:  {metrics['recall@20']*100:.2f}%")
         print(f"  NDCG@10:    {metrics['ndcg@10']*100:.2f}%")

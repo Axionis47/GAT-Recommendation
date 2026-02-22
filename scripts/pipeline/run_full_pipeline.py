@@ -22,9 +22,6 @@ import pandas as pd
 import torch
 from torch_geometric.data import Batch, Data
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
 from etpgt.model import (
     create_gat,
     create_graph_transformer,

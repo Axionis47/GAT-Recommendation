@@ -20,9 +20,6 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
 try:
     import onnx
     import onnxruntime as ort
@@ -121,7 +118,7 @@ def export_to_onnx(
         do_constant_folding=True,
     )
 
-    print(f"\n✓ ONNX model exported successfully!")
+    print("\n✓ ONNX model exported successfully!")
 
     # Validate ONNX model
     print("\nValidating ONNX model...")
@@ -174,7 +171,7 @@ def validate_onnx_inference(
     if max_diff < 1e-5:
         print("✓ ONNX inference matches PyTorch!")
     else:
-        print(f"⚠ Warning: Output difference > 1e-5")
+        print("⚠ Warning: Output difference > 1e-5")
 
     # Benchmark
     import time
@@ -193,7 +190,7 @@ def validate_onnx_inference(
         _ = ort_session.run(None, ort_inputs)
     onnx_time = (time.time() - start) / n_runs * 1000
 
-    print(f"\nInference benchmark (batch_size=4):")
+    print("\nInference benchmark (batch_size=4):")
     print(f"  PyTorch: {torch_time:.3f} ms")
     print(f"  ONNX:    {onnx_time:.3f} ms")
     print(f"  Speedup: {torch_time/onnx_time:.2f}x")
@@ -214,7 +211,6 @@ def export_full_model(
     from etpgt.model import (
         create_graph_transformer_optimized,
         create_graphsage,
-        create_gat,
     )
 
     print(f"Loading model from: {model_path}")
@@ -333,13 +329,14 @@ def export_production_model(
         model_class: Model class name
     """
     import json
-    import numpy as np
     from datetime import datetime
 
+    import numpy as np
+
     from etpgt.model import (
+        create_gat,
         create_graph_transformer_optimized,
         create_graphsage,
-        create_gat,
     )
 
     print(f"\n{'='*60}")
@@ -365,7 +362,7 @@ def export_production_model(
 
     hidden_dim = embedding_dim  # Usually same
 
-    print(f"\nModel config:")
+    print("\nModel config:")
     print(f"  num_items: {num_items}")
     print(f"  embedding_dim: {embedding_dim}")
     print(f"  hidden_dim: {hidden_dim}")
@@ -461,10 +458,10 @@ def export_production_model(
     print(f"\nArtifacts in {output_dir}:")
     print(f"  - session_recommender.onnx ({onnx_size:.1f} MB)")
     print(f"  - item_embeddings.npy ({embeddings_size:.1f} MB)")
-    print(f"  - model_metadata.json")
+    print("  - model_metadata.json")
     print(f"\nTotal size: {onnx_size + embeddings_size:.1f} MB")
-    print(f"\nNext step: Upload to GCS with:")
-    print(f"  bash scripts/gcp/04_upload_model_artifacts.sh")
+    print("\nNext step: Upload to GCS with:")
+    print("  bash scripts/gcp/04_upload_model_artifacts.sh")
 
 
 def main():

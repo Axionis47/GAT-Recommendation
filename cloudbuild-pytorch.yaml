@@ -1,6 +1,21 @@
 steps:
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-f', 'docker/serve.Dockerfile', '-t', 'us-central1-docker.pkg.dev/plotpointe/etpgt/etpgt-serve:latest', '.']
+    args:
+      - 'build'
+      - '-f'
+      - 'docker/serve.Dockerfile'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/etpgt/etpgt-serve:latest'
+      - '.'
+  - name: 'aquasec/trivy:latest'
+    args:
+      - 'image'
+      - '--exit-code'
+      - '1'
+      - '--severity'
+      - 'CRITICAL,HIGH'
+      - '--ignore-unfixed'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/etpgt/etpgt-serve:latest'
 images:
-  - 'us-central1-docker.pkg.dev/plotpointe/etpgt/etpgt-serve:latest'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/etpgt/etpgt-serve:latest'
 timeout: '1800s'

@@ -11,9 +11,15 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install
-COPY requirements-serve.txt .
-RUN pip install --no-cache-dir -r requirements-serve.txt
+# Copy requirements (lock file for reproducible builds, fallback to unpinned)
+COPY requirements-serve.lock* requirements-serve.txt ./
+
+# Install Python dependencies (prefer lock file if available)
+RUN if [ -f requirements-serve.lock ]; then \
+        pip install --no-cache-dir -r requirements-serve.lock; \
+    else \
+        pip install --no-cache-dir -r requirements-serve.txt; \
+    fi
 
 # Install PyTorch Geometric (CPU-only for inference to reduce dependencies)
 # Using CPU wheels since inference doesn't need CUDA for this model
