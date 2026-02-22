@@ -119,8 +119,10 @@ def load_model(model_name: str, num_items: int, checkpoint_path: Path, device: s
     return model, checkpoint.get("epoch", "unknown")
 
 
-def evaluate_model(model, dataloader, device: str, k_values: list[int] = [10, 20]):
+def evaluate_model(model, dataloader, device: str, k_values: list[int] | None = None):
     """Evaluate model on test data."""
+    if k_values is None:
+        k_values = [10, 20]
     model.eval()
 
     all_predictions = []
@@ -238,10 +240,7 @@ def main():
     )
 
     # Determine models to evaluate
-    if args.model == "all":
-        models_to_eval = list(MODEL_CONFIGS.keys())
-    else:
-        models_to_eval = [args.model]
+    models_to_eval = list(MODEL_CONFIGS.keys()) if args.model == "all" else [args.model]
 
     # Results
     results = {}

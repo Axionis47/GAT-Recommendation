@@ -543,8 +543,6 @@ def compute_recommendations(session_items: list[int], k: int = 10) -> dict:
     # Optionally wrap in OpenTelemetry span
     span = None
     if tracer is not None:
-        from opentelemetry import trace as otel_trace
-
         span = tracer.start_span("compute_recommendations")
         span.set_attribute("session.length", len(session_items))
         span.set_attribute("session.valid_items", len(valid_items))
@@ -654,7 +652,7 @@ async def recommend(request: RecommendRequest):
         )
     except ValueError as e:
         REQUEST_COUNT.labels(endpoint="/recommend", status="error").inc()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @app.post("/recommend/batch")

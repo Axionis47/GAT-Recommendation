@@ -1,6 +1,7 @@
 name: CD - Build & Push Serving Images
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -18,6 +19,7 @@ env:
 jobs:
   build-scan-push:
     name: Build & Push (${{ matrix.variant.name }})
+    if: ${{ vars.GCP_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read

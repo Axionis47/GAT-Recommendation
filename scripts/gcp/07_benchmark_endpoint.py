@@ -68,7 +68,7 @@ def benchmark_endpoint(
         """Make a single request and return latency."""
         start = time.time()
         try:
-            response = endpoint.predict(instances=[session])
+            endpoint.predict(instances=[session])
             latency = (time.time() - start) * 1000  # ms
             return latency, None
         except Exception as e:
@@ -84,15 +84,13 @@ def benchmark_endpoint(
             futures.append(executor.submit(make_request, session))
 
         # Collect results with progress
-        completed = 0
-        for future in as_completed(futures):
+        for completed, future in enumerate(as_completed(futures), 1):
             latency, error = future.result()
             if error:
                 errors += 1
             else:
                 latencies.append(latency)
 
-            completed += 1
             if completed % 10 == 0:
                 print(f"  Progress: {completed}/{num_requests}")
 

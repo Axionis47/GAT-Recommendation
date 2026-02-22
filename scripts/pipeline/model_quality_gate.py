@@ -504,7 +504,6 @@ def main():
             all_failures.extend(latency_failures)
 
             for key, value in latency_metrics.items():
-                slo_key = key.replace("latency_", "").replace("_ms", "_ms")
                 print(f"  {key}: {value}ms")
             if latency_failures:
                 for f in latency_failures:

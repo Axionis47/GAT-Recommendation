@@ -159,7 +159,7 @@ def create_batch_from_sessions(
         targets.append(target_idx)
 
         # Sample negatives (items not in session)
-        session_items_set = set([item_to_idx[i] for i in items])
+        session_items_set = {item_to_idx[i] for i in items}
         available = [i for i in range(num_items) if i not in session_items_set]
         neg_samples = torch.tensor(available[:num_negatives], dtype=torch.long)
         if len(neg_samples) < num_negatives:
@@ -239,7 +239,7 @@ def test_model_with_real_data(
         duration = time.time() - start_time
 
         # Check for NaN
-        if any(torch.isnan(torch.tensor(l)) for l in losses):
+        if any(torch.isnan(torch.tensor(loss_val)) for loss_val in losses):
             return {
                 "model": model_name,
                 "status": "FAIL",

@@ -113,7 +113,7 @@ def create_batch_from_csv(sessions_path: Path, graph_path: Path, batch_size: int
         data_list.append(data)
         targets.append(target_idx)
 
-        session_items_set = set([item_to_idx[i] for i in items])
+        session_items_set = {item_to_idx[i] for i in items}
         available = [i for i in range(num_items) if i not in session_items_set][:5]
         neg_samples = torch.tensor(available if len(available) == 5 else list(range(5)), dtype=torch.long)
         negatives_list.append(neg_samples)
