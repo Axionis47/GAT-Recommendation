@@ -1,64 +1,28 @@
 # Session-Based Recommendations with Graph Neural Networks
 
-I built a recommendation system that predicts what anonymous shoppers will buy next.
+A recommendation system that predicts what anonymous shoppers will buy next, using only their current browsing session.
 
-**The challenge:** Most recommendation systems need user history. When someone visits an e-commerce site for the first time, you know nothing about them. All you have is their current browsing session: the last 5-10 items they looked at.
+**The problem:** Most recommendation systems need user history. Anonymous visitors have none. All you have is the last 3-10 items they clicked on.
 
-**My solution:** Treat item co-occurrence as a graph. If items A and B frequently appear together in sessions, connect them. Then use Graph Neural Networks to learn which items are similar based on this structure.
+**The solution:** Build a co-occurrence graph from browsing sessions. Items that appear together get connected. Use Graph Neural Networks to learn item relationships from this structure. Predict the next item.
 
-**The result:** 38.28% Recall@10 on the RetailRocket dataset. The correct next item appears in the top 10 recommendations 38% of the time. This is 2.6x better than the GraphSAGE baseline.
+**The result:** 38.28% Recall@10 on RetailRocket. The correct next item lands in the top 10 recommendations 38% of the time. 2.6x better than the GraphSAGE baseline.
+
+**The budget story:** The full Graph Transformer was estimated at $1,880 for training. With $300 spread across multiple projects, that was like being asked to park a yacht in a bicycle rack. So we removed the FFN layers (88x speedup), reduced layers and heads, and the optimized model actually scored *higher*. Total cost: about $21.
 
 ## Results
 
-| Model | Recall@10 | NDCG@10 | Epochs | Training Time |
-|-------|-----------|---------|--------|---------------|
-| GraphSAGE | 14.79% | 9.87% | 44 | 12 hours |
-| GAT | 20.10% | 13.64% | 69 | 16 hours |
-| Graph Transformer (FFN) | 36.66% | 29.75% | 96 | 40+ hours |
-| **Graph Transformer (no FFN)** | **38.28%** | **30.65%** | **67** | **15.5 hours** |
-
-Trained on GCP Vertex AI with NVIDIA L4 GPU. Pre-trained weights available in `checkpoints/`.
-
-## Key Decisions
-
-**1. Temporal train/test splits with blackout periods**
-
-Many tutorials randomly split sessions, which causes data leakage. I split by time (70/15/15) with 2-day blackout periods between splits. This simulates real deployment: train on history, predict the future.
-
-**2. Laplacian positional encodings**
-
-Standard GNNs cannot distinguish nodes with identical local neighborhoods. Laplacian eigenvectors give each node a unique "fingerprint" based on its global position in the graph. This significantly improved accuracy.
-
-**3. Removing the FFN layer (88x speedup)**
-
-The feed-forward network in Transformer blocks adds capacity but is underutilized for graph recommendation. Removing it gave 88x training speedup with only 3% accuracy loss. Training went from 40 hours per epoch to 27 minutes.
-
-**4. Two layers is enough**
-
-Our co-occurrence graph has average degree 18. After 2 hops, each node already sees most of the graph. More layers cause over-smoothing where all embeddings converge to similar values.
-
-## Project Structure
-
-```
-GAT-Recommendation/
-├── etpgt/
-│   ├── model/           # GraphSAGE, GAT, Graph Transformer
-│   ├── train/           # DataLoader, Trainer, Loss functions
-│   ├── encodings/       # Laplacian positional encoding
-│   └── utils/           # Metrics, logging, I/O
-├── scripts/
-│   ├── data/            # Data pipeline (sessionize, split, build graph)
-│   ├── train/           # Training scripts
-│   ├── serve/           # FastAPI inference server
-│   └── pipeline/        # Full pipeline validation
-├── tests/               # Unit and integration tests
-└── docs/                # Documentation
-```
+| Model | Recall@10 | NDCG@10 | Cost | Trained? |
+|-------|-----------|---------|------|----------|
+| GraphSAGE | 14.79% | 9.87% | ~$22 | Yes |
+| GAT | 20.10% | 13.64% | ~$30 | Yes |
+| Graph Transformer (FFN) | 36.66% | 29.75% | ~$1,880 | No |
+| **Graph Transformer (optimized)** | **38.28%** | **30.65%** | **~$21** | **Yes** |
 
 ## Quick Start
 
 ```bash
-# Clone and setup
+# Setup
 git clone https://github.com/Axionis47/GAT-Recommendation.git
 cd GAT-Recommendation
 make setup
@@ -70,89 +34,80 @@ python scripts/data/01_download_retailrocket.py
 # Run data pipeline
 make data
 
-# Validate all models (quick test)
+# Validate all models (quick, no GPU)
 python scripts/pipeline/run_full_pipeline.py --num-sessions 100 --num-epochs 3
 
-# Train the best model
+# Full training (requires GPU)
 python scripts/train/train_baseline.py --model graph_transformer_optimized
+```
+
+## Project Structure
+
+```
+GAT-Recommendation/
+  etpgt/
+    model/           GraphSAGE, GAT, Graph Transformer
+    train/           DataLoader, Trainer, Loss functions
+    encodings/       Laplacian positional encoding
+    utils/           Metrics, logging, I/O
+  scripts/
+    data/            Data pipeline (sessionize, split, build graph)
+    train/           Training scripts
+    serve/           FastAPI inference server
+    pipeline/        Full pipeline validation
+    gcp/             GCP deployment scripts
+  tests/             Unit and integration tests
+  docs/              Documentation (you are here)
+  infra/             Terraform (GCS, Artifact Registry, IAM)
+  configs/           Experiment configurations
+  checkpoints/       Pre-trained model weights
 ```
 
 ## Documentation
 
-- [Data Pipeline](docs/DATA_PIPELINE.md): How raw events become training data
-- [Model Architectures](docs/MODELS.md): Each model explained with code references
-- [Experiments](docs/EXPERIMENTS.md): Results, ablations, and what I learned
+Start here and follow the links:
 
-## What I Learned
+### Architecture (C4 Model)
 
-**Things that worked:**
-- Temporal splits prevent data leakage that inflates metrics
-- Laplacian PE solves the structural equivalence problem
-- Removing FFN is a huge win for training cost
+| Level | Document | What It Covers |
+|-------|----------|----------------|
+| Context | [C1: Context](docs/architecture/C1_CONTEXT.md) | What problem, who uses it, constraints |
+| Container | [C2: Containers](docs/architecture/C2_CONTAINER.md) | Runtime containers, technology choices |
+| Component | [C3: Components](docs/architecture/C3_COMPONENT.md) | Internal components, class diagrams |
+| Code | [C4: Code](docs/architecture/C4_CODE.md) | Key code walkthroughs with snippets |
 
-**Things that surprised me:**
-- GAT only moderately beats GraphSAGE. The real gain comes from dot-product attention + positional encoding.
-- Co-occurrence structure matters more than fine-grained timing. I considered temporal attention biases but the sessions are short (3-5 items) and the graph already captures timing implicitly.
+### Deep Dives
 
-**What I would do differently:**
-- Add online A/B testing. Offline metrics do not always correlate with real user engagement.
-- Try contrastive learning instead of next-item prediction.
-- Add item features (categories, prices) for better cold-start handling.
+| Document | What It Covers |
+|----------|----------------|
+| [Data Pipeline](docs/DATA_PIPELINE.md) | How raw events become a graph, step by step |
+| [Models](docs/MODELS.md) | Every model architecture with all parameters |
+| [Experiments](docs/EXPERIMENTS.md) | Results, ablations, cost analysis, lessons |
+| [Deployment](docs/DEPLOYMENT.md) | Serving, Docker, Terraform, monitoring |
+| [Parameters](docs/PARAMETERS.md) | Complete parameter reference |
 
-## Technical Stack
+## Key Technical Decisions
 
-| Component | Technology |
-|-----------|------------|
-| Deep Learning | PyTorch 2.1+ |
-| Graph Neural Networks | PyTorch Geometric |
-| Eigendecomposition | SciPy |
-| Cloud Training | GCP Vertex AI |
-| Experiment Tracking | MLflow |
-| Model Serving | FastAPI, ONNX Runtime |
+1. **Temporal train/test splits with blackout periods.** Random splits leak future data. We split by time with 2-day blackout gaps.
 
-## Running Tests
+2. **Laplacian positional encodings.** Standard GNNs cannot tell apart nodes with identical neighborhoods. Laplacian eigenvectors give each node a unique structural fingerprint.
 
-```bash
-# Run all tests
-make test
+3. **Removing FFN layers (88x speedup).** The feed-forward network in Transformer blocks is underutilized for graph recommendation. Removing it gave 88x speedup with better accuracy.
 
-# Run with coverage
-make test-cov
+4. **Two GNN layers.** Average degree is 18. After 2 hops, each node sees ~324 nodes. More layers cause over-smoothing.
 
-# Run linting and type checking
-make ci-local
-```
+## Tech Stack
 
-The CI pipeline requires 60% code coverage and passes on Python 3.10, 3.11, and 3.12.
-
-## Model Serving
-
-The project includes a FastAPI server for real-time inference.
-
-```bash
-# Install serving dependencies
-pip install ".[serve]"
-
-# Start the server
-uvicorn scripts.serve.app:app --host 0.0.0.0 --port 8000
-
-# Test the endpoint
-curl -X POST http://localhost:8000/recommend \
-    -H "Content-Type: application/json" \
-    -d '{"session_items": [1, 2, 3], "k": 10}'
-```
-
-**Endpoints:**
-- `GET /health` - Health check and model info
-- `POST /recommend` - Get recommendations for a session
-- `POST /recommend/batch` - Batch recommendations for multiple sessions
-
-**ONNX Export:**
-```bash
-# Export to ONNX for production deployment
-python scripts/export/export_onnx.py --checkpoint checkpoints/best_model.pt
-```
+| Category | Technologies |
+|----------|-------------|
+| Deep Learning | PyTorch 2.1+, PyTorch Geometric 2.4+ |
+| Data | pandas, NumPy, SciPy, DVC |
+| Serving | FastAPI, ONNX Runtime, Uvicorn |
+| Cloud | GCP Vertex AI, Cloud Storage, Artifact Registry |
+| Infrastructure | Terraform, Docker, Cloud Build |
+| Quality | pytest, ruff, black, isort, mypy |
+| Monitoring | Prometheus, Evidently, MLflow |
 
 ## License
 
-MIT
+See [LICENSE](LICENSE).
