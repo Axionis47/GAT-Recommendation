@@ -23,6 +23,7 @@ import torch.nn as nn
 try:
     import onnx
     import onnxruntime as ort
+
     ONNX_AVAILABLE = True
 except ImportError:
     ONNX_AVAILABLE = False
@@ -175,6 +176,7 @@ def validate_onnx_inference(
 
     # Benchmark
     import time
+
     n_runs = 100
 
     # PyTorch timing
@@ -208,10 +210,7 @@ def export_full_model(
         output_path: Path to save ONNX model
         model_class: Model class name
     """
-    from etpgt.model import (
-        create_graph_transformer_optimized,
-        create_graphsage,
-    )
+    from etpgt.model import create_graph_transformer_optimized, create_graphsage
 
     print(f"Loading model from: {model_path}")
 
@@ -302,6 +301,7 @@ def create_demo_export(output_dir: Path, num_items: int = 1000, embedding_dim: i
     }
 
     import json
+
     with open(output_dir / "model_metadata.json", "w") as f:
         json.dump(metadata, f, indent=2)
 
@@ -333,11 +333,7 @@ def export_production_model(
 
     import numpy as np
 
-    from etpgt.model import (
-        create_gat,
-        create_graph_transformer_optimized,
-        create_graphsage,
-    )
+    from etpgt.model import create_gat, create_graph_transformer_optimized, create_graphsage
 
     print(f"\n{'='*60}")
     print("EXPORTING PRODUCTION MODEL FOR VERTEX AI")
@@ -388,7 +384,9 @@ def export_production_model(
     }
 
     if model_class not in model_factories:
-        raise ValueError(f"Unknown model class: {model_class}. Choose from: {list(model_factories.keys())}")
+        raise ValueError(
+            f"Unknown model class: {model_class}. Choose from: {list(model_factories.keys())}"
+        )
 
     model = model_factories[model_class]()
 
@@ -469,11 +467,18 @@ def main():
     parser.add_argument("--model-path", type=str, help="Path to trained model checkpoint")
     parser.add_argument("--output", type=str, default="model.onnx", help="Output ONNX path")
     parser.add_argument("--output-dir", type=str, help="Output directory for production export")
-    parser.add_argument("--model-class", type=str, default="graph_transformer_optimized",
-                        choices=["graph_transformer_optimized", "graphsage", "gat"])
+    parser.add_argument(
+        "--model-class",
+        type=str,
+        default="graph_transformer_optimized",
+        choices=["graph_transformer_optimized", "graphsage", "gat"],
+    )
     parser.add_argument("--demo", action="store_true", help="Create demo export")
-    parser.add_argument("--production", action="store_true",
-                        help="Production export for Vertex AI (includes embeddings)")
+    parser.add_argument(
+        "--production",
+        action="store_true",
+        help="Production export for Vertex AI (includes embeddings)",
+    )
     parser.add_argument("--num-items", type=int, default=1000, help="Number of items for demo")
     parser.add_argument("--embedding-dim", type=int, default=64, help="Embedding dimension")
     args = parser.parse_args()
@@ -489,7 +494,9 @@ def main():
         )
     elif args.production:
         # Production export for Vertex AI
-        model_path = args.model_path or str(project_root / "checkpoints/graph_transformer_optimized_best.pt")
+        model_path = args.model_path or str(
+            project_root / "checkpoints/graph_transformer_optimized_best.pt"
+        )
         output_dir = args.output_dir or str(project_root / "exports/onnx/production")
         export_production_model(
             model_path=Path(model_path),
@@ -508,7 +515,9 @@ def main():
         print("Usage:")
         print("  Demo export:       python export_onnx.py --demo")
         print("  Production export: python export_onnx.py --production")
-        print("  Custom export:     python export_onnx.py --model-path checkpoint.pt --output model.onnx")
+        print(
+            "  Custom export:     python export_onnx.py --model-path checkpoint.pt --output model.onnx"
+        )
         print("")
         print("Options:")
         print("  --production        Export for Vertex AI (includes embeddings as .npy)")

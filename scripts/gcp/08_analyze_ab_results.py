@@ -51,13 +51,13 @@ def query_endpoint_logs(
     start_time = end_time - timedelta(hours=hours)
 
     # Build filter
-    filter_str = f'''
+    filter_str = f"""
         resource.type="aiplatform.googleapis.com/Endpoint"
         resource.labels.endpoint_id="{endpoint_id}"
         httpRequest.requestMethod="POST"
         timestamp >= "{start_time.isoformat()}"
         timestamp <= "{end_time.isoformat()}"
-    '''
+    """
 
     print(f"Querying logs for last {hours} hours...")
     print(f"  Start: {start_time.isoformat()}")
@@ -78,12 +78,14 @@ def parse_latency_from_logs(entries: list) -> dict:
     Returns:
         Dictionary mapping deployed_model_id to list of latencies
     """
-    results = defaultdict(lambda: {
-        "latencies": [],
-        "errors": 0,
-        "requests": 0,
-        "display_name": "unknown",
-    })
+    results = defaultdict(
+        lambda: {
+            "latencies": [],
+            "errors": 0,
+            "requests": 0,
+            "display_name": "unknown",
+        }
+    )
 
     for entry in entries:
         try:
@@ -101,7 +103,7 @@ def parse_latency_from_logs(entries: list) -> dict:
                 if latency_str:
                     # Parse duration string (e.g., "0.123s")
                     if isinstance(latency_str, str):
-                        latency_ms = float(latency_str.rstrip('s')) * 1000
+                        latency_ms = float(latency_str.rstrip("s")) * 1000
                     else:
                         # timedelta or Duration object
                         latency_ms = latency_str.total_seconds() * 1000
@@ -201,7 +203,7 @@ def perform_statistical_test(latencies_a: list, latencies_b: list) -> dict:
         }
 
     # Non-parametric test (doesn't assume normal distribution)
-    stat, p_value = stats.mannwhitneyu(latencies_a, latencies_b, alternative='two-sided')
+    stat, p_value = stats.mannwhitneyu(latencies_a, latencies_b, alternative="two-sided")
 
     # Calculate effect size
     mean_a = sum(latencies_a) / len(latencies_a)
@@ -266,24 +268,34 @@ def generate_recommendation(results: dict, stats_test: dict) -> str:
 
     if stats_test.get("significant"):
         recommendation.append(f"**{faster_model}** shows statistically significant better latency:")
-        recommendation.append(f"- P50 latency: {faster_p50}ms vs {slower_p50}ms ({speedup:.1f}% faster)")
+        recommendation.append(
+            f"- P50 latency: {faster_p50}ms vs {slower_p50}ms ({speedup:.1f}% faster)"
+        )
         recommendation.append("")
         if speedup > 20:
             recommendation.append("**Strong recommendation:** Shift traffic to the faster model")
         elif speedup > 10:
-            recommendation.append("**Moderate recommendation:** Consider shifting traffic to the faster model")
+            recommendation.append(
+                "**Moderate recommendation:** Consider shifting traffic to the faster model"
+            )
         else:
-            recommendation.append("**Mild recommendation:** Difference is small, consider other factors")
+            recommendation.append(
+                "**Mild recommendation:** Difference is small, consider other factors"
+            )
     else:
         recommendation.append("No statistically significant difference in latency between models.")
         recommendation.append("Consider:")
         recommendation.append("- Collecting more data (current sample may be too small)")
         recommendation.append("- Evaluating based on other metrics (cost, memory usage)")
-        recommendation.append("- Choosing based on operational factors (ease of deployment, maintainability)")
+        recommendation.append(
+            "- Choosing based on operational factors (ease of deployment, maintainability)"
+        )
 
     if error_a > 1 or error_b > 1:
         recommendation.append("")
-        recommendation.append(f"**Note:** Error rates are elevated ({name_a}: {error_a}%, {name_b}: {error_b}%)")
+        recommendation.append(
+            f"**Note:** Error rates are elevated ({name_a}: {error_a}%, {name_b}: {error_b}%)"
+        )
         recommendation.append("Investigate errors before making traffic decisions.")
 
     return "\n".join(recommendation)
@@ -294,7 +306,9 @@ def main():
     parser.add_argument("--project-id", type=str, required=True, help="GCP project ID")
     parser.add_argument("--region", type=str, default="us-central1", help="GCP region")
     parser.add_argument("--endpoint-id", type=str, required=True, help="Endpoint resource ID")
-    parser.add_argument("--hours", type=int, default=24, help="Hours of data to analyze (default: 24)")
+    parser.add_argument(
+        "--hours", type=int, default=24, help="Hours of data to analyze (default: 24)"
+    )
     parser.add_argument("--output", type=str, help="Output JSON file for results")
     args = parser.parse_args()
 
@@ -334,8 +348,7 @@ def main():
             data["display_name"] = model_names.get(model_id, model_id)
             data["stats"] = calculate_statistics(data["latencies"])
             data["error_rate_pct"] = round(
-                (data["errors"] / data["requests"] * 100) if data["requests"] > 0 else 0,
-                2
+                (data["errors"] / data["requests"] * 100) if data["requests"] > 0 else 0, 2
             )
 
         # Print results
@@ -408,6 +421,7 @@ def main():
     except Exception as e:
         print(f"\nError: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 

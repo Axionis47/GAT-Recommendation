@@ -170,9 +170,7 @@ def main():
         default="all",
         help="Model to evaluate (default: all)",
     )
-    parser.add_argument(
-        "--batch-size", type=int, default=32, help="Batch size (default: 32)"
-    )
+    parser.add_argument("--batch-size", type=int, default=32, help="Batch size (default: 32)")
     parser.add_argument(
         "--num-samples",
         type=int,
@@ -207,11 +205,14 @@ def main():
     # Get num_items from graph
     edges_df = pd.read_csv(graph_path)
     test_df = pd.read_csv(test_path)
-    num_items = max(
-        test_df["itemid"].max(),
-        edges_df["item_i"].max(),
-        edges_df["item_j"].max(),
-    ) + 1
+    num_items = (
+        max(
+            test_df["itemid"].max(),
+            edges_df["item_i"].max(),
+            edges_df["item_j"].max(),
+        )
+        + 1
+    )
     print(f"Number of items: {num_items}")
 
     # Create dataset

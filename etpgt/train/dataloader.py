@@ -83,7 +83,7 @@ class SessionDataset(Dataset):
 
         # Truncate if too long
         if len(session_items) > self.max_session_length:
-            session_items = session_items[-self.max_session_length:]
+            session_items = session_items[-self.max_session_length :]
 
         # Target is last item
         target_item = session_items[-1]

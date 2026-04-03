@@ -3,6 +3,7 @@
 import pytest
 import torch
 
+from etpgt.encodings.laplacian_pe import LaplacianPE, LaplacianPECached, compute_laplacian_pe
 from etpgt.model import (
     GAT,
     GraphSAGE,
@@ -183,9 +184,11 @@ class TestModelConsistency:
         self, create_fn, needs_num_heads, small_model_config, dummy_batch
     ):
         """Test that all models produce the same output shape."""
-        config = small_model_config if needs_num_heads else {
-            k: v for k, v in small_model_config.items() if k != "num_heads"
-        }
+        config = (
+            small_model_config
+            if needs_num_heads
+            else {k: v for k, v in small_model_config.items() if k != "num_heads"}
+        )
         model = create_fn(**config)
         model.eval()
 
@@ -207,9 +210,11 @@ class TestModelConsistency:
         self, create_fn, needs_num_heads, small_model_config, dummy_batch
     ):
         """Test that all models have working predict() method."""
-        config = small_model_config if needs_num_heads else {
-            k: v for k, v in small_model_config.items() if k != "num_heads"
-        }
+        config = (
+            small_model_config
+            if needs_num_heads
+            else {k: v for k, v in small_model_config.items() if k != "num_heads"}
+        )
         model = create_fn(**config)
         model.eval()
 
@@ -219,3 +224,54 @@ class TestModelConsistency:
 
         assert predictions.shape == (2, 10)  # batch_size=2, k=10
         assert predictions.dtype == torch.long
+
+
+class TestLaplacianPE:
+    """Tests for Laplacian Positional Encoding."""
+
+    def test_compute_laplacian_pe(self):
+        """Test raw Laplacian PE computation."""
+        # Simple 4-node graph: 0-1-2-3
+        edge_index = torch.tensor([[0, 1, 1, 2, 2, 3], [1, 0, 2, 1, 3, 2]])
+        pe = compute_laplacian_pe(edge_index, num_nodes=4, k=2)
+        assert pe.shape == (4, 2)
+        assert pe.dtype == torch.float32
+        assert (pe >= 0).all()  # absolute value applied
+
+    def test_laplacian_pe_module(self):
+        """Test LaplacianPE nn.Module."""
+        from torch_geometric.data import Data
+
+        edge_index = torch.tensor([[0, 1, 1, 2, 2, 3], [1, 0, 2, 1, 3, 2]])
+        data = Data(edge_index=edge_index, num_nodes=4)
+
+        module = LaplacianPE(k=2, embedding_dim=16)
+        pe = module(data)
+        assert pe.shape == (4, 16)
+
+    def test_laplacian_pe_cached(self):
+        """Test LaplacianPECached with precompute and forward."""
+        from torch_geometric.data import Data
+
+        edge_index = torch.tensor([[0, 1, 1, 2, 2, 3], [1, 0, 2, 1, 3, 2]])
+        data = Data(edge_index=edge_index, num_nodes=4)
+
+        module = LaplacianPECached(k=2, embedding_dim=16)
+        module.precompute(data)
+
+        node_indices = torch.tensor([0, 2, 3])
+        pe = module(node_indices)
+        assert pe.shape == (3, 16)
+
+    def test_laplacian_pe_cached_project(self):
+        """Test the project method."""
+        module = LaplacianPECached(k=2, embedding_dim=16)
+        raw_pe = torch.randn(4, 2)
+        projected = module.project(raw_pe)
+        assert projected.shape == (4, 16)
+
+    def test_laplacian_pe_cached_raises_without_precompute(self):
+        """Test that forward raises if precompute not called."""
+        module = LaplacianPECached(k=2, embedding_dim=16)
+        with pytest.raises(RuntimeError, match="not precomputed"):
+            module(torch.tensor([0, 1]))

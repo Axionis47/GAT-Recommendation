@@ -46,9 +46,7 @@ def create_endpoint(
     aiplatform.init(project=project_id, location=region)
 
     # Check if endpoint already exists
-    existing_endpoints = aiplatform.Endpoint.list(
-        filter=f'display_name="{endpoint_name}"'
-    )
+    existing_endpoints = aiplatform.Endpoint.list(filter=f'display_name="{endpoint_name}"')
 
     if existing_endpoints:
         print(f"Endpoint '{endpoint_name}' already exists, reusing...")
@@ -187,10 +185,12 @@ def deploy_ab_test(
     print(f"Endpoint:      {endpoint.resource_name}")
     print(f"Traffic split: PyTorch={pytorch_traffic}%, ONNX={onnx_traffic}%")
     print("\nTest the endpoint:")
-    print(f"  curl -X POST '{region}-aiplatform.googleapis.com/v1/{endpoint.resource_name}:predict' \\")
+    print(
+        f"  curl -X POST '{region}-aiplatform.googleapis.com/v1/{endpoint.resource_name}:predict' \\"
+    )
     print('    -H "Authorization: Bearer $(gcloud auth print-access-token)" \\')
     print('    -H "Content-Type: application/json" \\')
-    print("    -d '{\"instances\": [{\"session_items\": [1,2,3], \"k\": 10}]}'")
+    print('    -d \'{"instances": [{"session_items": [1,2,3], "k": 10}]}\'')
     print(f"{'='*60}")
 
     return endpoint
@@ -200,27 +200,40 @@ def main():
     parser = argparse.ArgumentParser(description="Deploy to Vertex AI Endpoint")
     parser.add_argument("--project-id", type=str, required=True, help="GCP project ID")
     parser.add_argument("--region", type=str, default="us-central1", help="GCP region")
-    parser.add_argument("--endpoint-name", type=str, default="gat-recommendation-endpoint",
-                        help="Endpoint display name")
+    parser.add_argument(
+        "--endpoint-name",
+        type=str,
+        default="gat-recommendation-endpoint",
+        help="Endpoint display name",
+    )
 
     # Single model deployment
     parser.add_argument("--model-id", type=str, help="Single model resource ID")
 
     # A/B test deployment
-    parser.add_argument("--ab-test", action="store_true",
-                        help="Deploy both models for A/B testing")
+    parser.add_argument("--ab-test", action="store_true", help="Deploy both models for A/B testing")
     parser.add_argument("--pytorch-model-id", type=str, help="PyTorch model resource ID")
     parser.add_argument("--onnx-model-id", type=str, help="ONNX model resource ID")
-    parser.add_argument("--pytorch-traffic", type=int, default=50,
-                        help="Traffic percentage for PyTorch model (default: 50)")
+    parser.add_argument(
+        "--pytorch-traffic",
+        type=int,
+        default=50,
+        help="Traffic percentage for PyTorch model (default: 50)",
+    )
 
     # Machine configuration
-    parser.add_argument("--machine-type", type=str, default="n1-standard-4",
-                        help="Machine type (default: n1-standard-4)")
-    parser.add_argument("--min-replicas", type=int, default=1,
-                        help="Minimum replica count (default: 1)")
-    parser.add_argument("--max-replicas", type=int, default=3,
-                        help="Maximum replica count (default: 3)")
+    parser.add_argument(
+        "--machine-type",
+        type=str,
+        default="n1-standard-4",
+        help="Machine type (default: n1-standard-4)",
+    )
+    parser.add_argument(
+        "--min-replicas", type=int, default=1, help="Minimum replica count (default: 1)"
+    )
+    parser.add_argument(
+        "--max-replicas", type=int, default=3, help="Maximum replica count (default: 3)"
+    )
 
     args = parser.parse_args()
 
@@ -276,6 +289,7 @@ def main():
     except Exception as e:
         print(f"\nError: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 

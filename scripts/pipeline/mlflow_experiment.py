@@ -21,6 +21,7 @@ import torch
 try:
     import mlflow
     import mlflow.pytorch
+
     MLFLOW_AVAILABLE = True
 except ImportError:
     MLFLOW_AVAILABLE = False
@@ -67,10 +68,10 @@ def create_batch_from_csv(sessions_path: Path, graph_path: Path, batch_size: int
     graph_df = pd.read_csv(graph_path)
 
     # Get unique sessions
-    session_ids = sessions_df['session_id'].unique()[:batch_size]
+    session_ids = sessions_df["session_id"].unique()[:batch_size]
 
     # Build item to index mapping
-    all_items = sorted(sessions_df['itemid'].unique())
+    all_items = sorted(sessions_df["itemid"].unique())
     item_to_idx = {item: idx for idx, item in enumerate(all_items)}
     num_items = len(all_items)
 
@@ -79,9 +80,9 @@ def create_batch_from_csv(sessions_path: Path, graph_path: Path, batch_size: int
     negatives_list = []
 
     for session_id in session_ids:
-        session_data = sessions_df[sessions_df['session_id'] == session_id]
-        session_data = session_data.sort_values('timestamp')
-        items = session_data['itemid'].values
+        session_data = sessions_df[sessions_df["session_id"] == session_id]
+        session_data = session_data.sort_values("timestamp")
+        items = session_data["itemid"].values
 
         if len(items) < 2:
             continue
@@ -96,13 +97,12 @@ def create_batch_from_csv(sessions_path: Path, graph_path: Path, batch_size: int
 
         context_set = set(context_items)
         session_edges = graph_df[
-            (graph_df['item_i'].isin(context_set)) &
-            (graph_df['item_j'].isin(context_set))
+            (graph_df["item_i"].isin(context_set)) & (graph_df["item_j"].isin(context_set))
         ]
 
         if len(session_edges) > 0:
-            edge_src = [local_to_global[item_to_idx[i]] for i in session_edges['item_i']]
-            edge_dst = [local_to_global[item_to_idx[j]] for j in session_edges['item_j']]
+            edge_src = [local_to_global[item_to_idx[i]] for i in session_edges["item_i"]]
+            edge_dst = [local_to_global[item_to_idx[j]] for j in session_edges["item_j"]]
             edge_index = torch.tensor([edge_src + edge_dst, edge_dst + edge_src], dtype=torch.long)
         else:
             n = len(local_items)
@@ -115,7 +115,9 @@ def create_batch_from_csv(sessions_path: Path, graph_path: Path, batch_size: int
 
         session_items_set = {item_to_idx[i] for i in items}
         available = [i for i in range(num_items) if i not in session_items_set][:5]
-        neg_samples = torch.tensor(available if len(available) == 5 else list(range(5)), dtype=torch.long)
+        neg_samples = torch.tensor(
+            available if len(available) == 5 else list(range(5)), dtype=torch.long
+        )
         negatives_list.append(neg_samples)
 
     batch = Batch.from_data_list(data_list)
@@ -229,8 +231,12 @@ def train_with_mlflow(
 
 def main():
     parser = argparse.ArgumentParser(description="MLflow Experiment Tracking")
-    parser.add_argument("--model", type=str, default="graph_transformer_optimized",
-                       choices=list(MODEL_REGISTRY.keys()))
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="graph_transformer_optimized",
+        choices=list(MODEL_REGISTRY.keys()),
+    )
     parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument("--embedding-dim", type=int, default=64)
     parser.add_argument("--hidden-dim", type=int, default=64)

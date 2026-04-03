@@ -168,17 +168,30 @@ def main():
     parser = argparse.ArgumentParser(description="Benchmark Vertex AI Endpoint")
     parser.add_argument("--project-id", type=str, required=True, help="GCP project ID")
     parser.add_argument("--region", type=str, default="us-central1", help="GCP region")
-    parser.add_argument("--endpoint-name", type=str, default="gat-recommendation-endpoint",
-                        help="Endpoint display name")
-    parser.add_argument("--endpoint-id", type=str, help="Endpoint resource ID (alternative to name)")
-    parser.add_argument("--num-requests", type=int, default=100,
-                        help="Number of requests to run (default: 100)")
-    parser.add_argument("--concurrent", type=int, default=10,
-                        help="Number of concurrent requests (default: 10)")
-    parser.add_argument("--num-items", type=int, default=10000,
-                        help="Max item ID for test sessions (default: 10000)")
-    parser.add_argument("--machine-type", type=str, default="n1-standard-4",
-                        help="Machine type for cost estimation")
+    parser.add_argument(
+        "--endpoint-name",
+        type=str,
+        default="gat-recommendation-endpoint",
+        help="Endpoint display name",
+    )
+    parser.add_argument(
+        "--endpoint-id", type=str, help="Endpoint resource ID (alternative to name)"
+    )
+    parser.add_argument(
+        "--num-requests", type=int, default=100, help="Number of requests to run (default: 100)"
+    )
+    parser.add_argument(
+        "--concurrent", type=int, default=10, help="Number of concurrent requests (default: 10)"
+    )
+    parser.add_argument(
+        "--num-items",
+        type=int,
+        default=10000,
+        help="Max item ID for test sessions (default: 10000)",
+    )
+    parser.add_argument(
+        "--machine-type", type=str, default="n1-standard-4", help="Machine type for cost estimation"
+    )
     parser.add_argument("--output", type=str, help="Output JSON file for results")
     args = parser.parse_args()
 
@@ -191,9 +204,7 @@ def main():
         if args.endpoint_id:
             endpoint = aiplatform.Endpoint(args.endpoint_id)
         else:
-            endpoints = aiplatform.Endpoint.list(
-                filter=f'display_name="{args.endpoint_name}"'
-            )
+            endpoints = aiplatform.Endpoint.list(filter=f'display_name="{args.endpoint_name}"')
             if not endpoints:
                 print(f"Endpoint '{args.endpoint_name}' not found")
                 return 1
@@ -292,6 +303,7 @@ def main():
     except Exception as e:
         print(f"\nError: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 

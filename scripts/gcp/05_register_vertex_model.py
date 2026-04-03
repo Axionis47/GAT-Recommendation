@@ -76,11 +76,13 @@ def register_model(
     # Default labels
     if labels is None:
         labels = {}
-    labels.update({
-        "model_type": "gat-recommendation",
-        "variant": variant,
-        "framework": variant,
-    })
+    labels.update(
+        {
+            "model_type": "gat-recommendation",
+            "variant": variant,
+            "framework": variant,
+        }
+    )
 
     # Register model
     print("\nUploading model to Vertex AI Model Registry...")
@@ -113,12 +115,15 @@ def main():
     parser.add_argument("--project-id", type=str, required=True, help="GCP project ID")
     parser.add_argument("--region", type=str, default="us-central1", help="GCP region")
     parser.add_argument("--model-name", type=str, required=True, help="Model display name")
-    parser.add_argument("--container-image", type=str, required=True,
-                        help="Container image URI (Artifact Registry)")
-    parser.add_argument("--artifact-uri", type=str, required=True,
-                        help="GCS URI for model artifacts")
-    parser.add_argument("--variant", type=str, choices=["pytorch", "onnx"], default="pytorch",
-                        help="Model variant")
+    parser.add_argument(
+        "--container-image", type=str, required=True, help="Container image URI (Artifact Registry)"
+    )
+    parser.add_argument(
+        "--artifact-uri", type=str, required=True, help="GCS URI for model artifacts"
+    )
+    parser.add_argument(
+        "--variant", type=str, choices=["pytorch", "onnx"], default="pytorch", help="Model variant"
+    )
     parser.add_argument("--description", type=str, default="", help="Model description")
     args = parser.parse_args()
 

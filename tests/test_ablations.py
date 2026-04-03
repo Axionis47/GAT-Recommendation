@@ -79,9 +79,7 @@ class TestModelAblations:
     @pytest.mark.parametrize("use_ffn", [True, False])
     def test_graph_transformer_ffn_ablation(self, use_ffn, base_config, dummy_batch):
         """Verify FFN ablation works."""
-        model = create_graph_transformer(
-            **base_config, use_laplacian_pe=False, use_ffn=use_ffn
-        )
+        model = create_graph_transformer(**base_config, use_laplacian_pe=False, use_ffn=use_ffn)
         model.train()
 
         output = model(dummy_batch)
@@ -91,9 +89,7 @@ class TestModelAblations:
         assert output.shape == (2, base_config["hidden_dim"])
         assert not torch.isnan(output).any()
 
-    @pytest.mark.parametrize(
-        "readout_type", ["mean", "max", "last", "attention"]
-    )
+    @pytest.mark.parametrize("readout_type", ["mean", "max", "last", "attention"])
     def test_readout_type_ablation(self, readout_type, base_config, dummy_batch):
         """Verify all readout types work."""
         config_no_heads = {k: v for k, v in base_config.items() if k != "num_heads"}
@@ -125,9 +121,7 @@ class TestLossAblations:
 
         return session_embeddings, target_items, negative_items, item_embedding
 
-    @pytest.mark.parametrize(
-        "loss_type", ["listwise", "bpr", "dual", "sampled_softmax"]
-    )
+    @pytest.mark.parametrize("loss_type", ["listwise", "bpr", "dual", "sampled_softmax"])
     def test_loss_function_ablation(self, loss_type, loss_test_data):
         """Verify each loss function works in training."""
         session_emb, targets, negatives, item_emb = loss_test_data

@@ -1,5 +1,6 @@
 """Tests for utility modules."""
 
+import logging
 import tempfile
 from pathlib import Path
 
@@ -7,7 +8,9 @@ import pytest
 import torch
 
 from etpgt.utils.io import load_config, load_json, save_json
-from etpgt.utils.metrics import compute_ndcg_at_k, compute_recall_at_k
+from etpgt.utils.logging import get_logger
+from etpgt.utils.metrics import compute_ndcg_at_k, compute_recall_at_k, compute_stratified_metrics
+from etpgt.utils.profiler import measure_memory, reset_memory_stats, timer
 from etpgt.utils.seed import set_seed
 
 
@@ -88,3 +91,71 @@ def test_compute_ndcg_at_k() -> None:
     # Average: (1.0 + 0.4307 + 0.0) / 3 ≈ 0.4769
 
     assert ndcg_at_5 > 0.4 and ndcg_at_5 < 0.5, f"NDCG@5 should be ~0.48, got {ndcg_at_5}"
+
+
+def test_compute_stratified_metrics() -> None:
+    """Test stratified metrics computation."""
+    predictions = torch.tensor(
+        [[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [1, 2, 3, 4, 5], [6, 7, 8, 9, 10]]
+    )
+    targets = torch.tensor([1, 7, 3, 10])
+    strata = torch.tensor([0, 0, 1, 1])
+
+    results = compute_stratified_metrics(predictions, targets, strata, k_values=[5])
+
+    assert "stratum_0" in results
+    assert "stratum_1" in results
+    assert results["stratum_0"]["count"] == 2
+    assert results["stratum_1"]["count"] == 2
+    assert "recall@5" in results["stratum_0"]
+    assert "ndcg@5" in results["stratum_0"]
+
+
+def test_timer() -> None:
+    """Test timer context manager."""
+    results: dict[str, float] = {}
+    with timer("test_block", results):
+        _ = sum(range(1000))
+
+    assert "test_block" in results
+    assert results["test_block"] >= 0.0
+
+
+def test_measure_memory() -> None:
+    """Test measure_memory returns valid dict on CPU."""
+    mem = measure_memory()
+    assert "allocated_mb" in mem
+    assert "reserved_mb" in mem
+    assert "max_allocated_mb" in mem
+    assert mem["allocated_mb"] == 0.0  # No GPU
+
+
+def test_reset_memory_stats() -> None:
+    """Test reset_memory_stats runs without error on CPU."""
+    reset_memory_stats()
+
+
+def test_get_logger() -> None:
+    """Test logger creation."""
+    logger = get_logger("test_logger_unique_1234")
+    assert isinstance(logger, logging.Logger)
+    assert logger.level == logging.INFO
+    assert len(logger.handlers) > 0
+
+
+def test_get_logger_with_file() -> None:
+    """Test logger creation with file handler."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        log_path = str(Path(tmpdir) / "test.log")
+        logger = get_logger("test_file_logger_5678", log_file=log_path)
+        logger.info("test message")
+        assert Path(log_path).exists()
+
+
+def test_get_logger_no_duplicate_handlers() -> None:
+    """Test that calling get_logger twice doesn't add duplicate handlers."""
+    name = "test_dedup_logger_9012"
+    logger1 = get_logger(name)
+    handler_count = len(logger1.handlers)
+    logger2 = get_logger(name)
+    assert len(logger2.handlers) == handler_count

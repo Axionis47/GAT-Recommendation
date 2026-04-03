@@ -57,18 +57,17 @@ def create_test_subset(
     print(f"Loaded {sessions_df['session_id'].nunique():,} sessions")
 
     # Get unique session IDs and sample
-    unique_sessions = sessions_df['session_id'].unique()[:num_sessions]
-    sessions_subset = sessions_df[sessions_df['session_id'].isin(unique_sessions)]
+    unique_sessions = sessions_df["session_id"].unique()[:num_sessions]
+    sessions_subset = sessions_df[sessions_df["session_id"].isin(unique_sessions)]
 
     # Get items in subset
-    subset_items = set(sessions_subset['itemid'].unique())
+    subset_items = set(sessions_subset["itemid"].unique())
     print(f"Subset: {len(unique_sessions)} sessions, {len(subset_items):,} unique items")
 
     # Load graph and filter to subset items
     graph_df = pd.read_csv(graph_path)
     graph_subset = graph_df[
-        (graph_df['item_i'].isin(subset_items)) &
-        (graph_df['item_j'].isin(subset_items))
+        (graph_df["item_i"].isin(subset_items)) & (graph_df["item_j"].isin(subset_items))
     ]
     print(f"Graph subset: {len(graph_subset):,} edges (from {len(graph_df):,})")
 
@@ -76,8 +75,8 @@ def create_test_subset(
     if output_dir:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
-        sessions_subset.to_csv(output_dir / 'sessions_subset.csv', index=False)
-        graph_subset.to_csv(output_dir / 'graph_subset.csv', index=False)
+        sessions_subset.to_csv(output_dir / "sessions_subset.csv", index=False)
+        graph_subset.to_csv(output_dir / "graph_subset.csv", index=False)
         print(f"Saved subset to {output_dir}")
 
     return sessions_subset, graph_subset
@@ -101,10 +100,10 @@ def create_batch_from_sessions(
         PyG Batch object
     """
     # Get unique sessions
-    session_ids = sessions_df['session_id'].unique()[:batch_size]
+    session_ids = sessions_df["session_id"].unique()[:batch_size]
 
     # Build item to index mapping
-    all_items = sorted(sessions_df['itemid'].unique())
+    all_items = sorted(sessions_df["itemid"].unique())
     item_to_idx = {item: idx for idx, item in enumerate(all_items)}
     num_items = len(all_items)
 
@@ -113,11 +112,11 @@ def create_batch_from_sessions(
     negatives_list = []
 
     for session_id in session_ids:
-        session_data = sessions_df[sessions_df['session_id'] == session_id]
-        session_data = session_data.sort_values('timestamp')
+        session_data = sessions_df[sessions_df["session_id"] == session_id]
+        session_data = session_data.sort_values("timestamp")
 
         # Get items in session
-        items = session_data['itemid'].values
+        items = session_data["itemid"].values
         if len(items) < 2:
             continue
 
@@ -136,14 +135,13 @@ def create_batch_from_sessions(
         # Get edges within context items
         context_set = set(context_items)
         session_edges = graph_df[
-            (graph_df['item_i'].isin(context_set)) &
-            (graph_df['item_j'].isin(context_set))
+            (graph_df["item_i"].isin(context_set)) & (graph_df["item_j"].isin(context_set))
         ]
 
         # Build edge index with local indices
         if len(session_edges) > 0:
-            edge_src = [local_to_global[item_to_idx[i]] for i in session_edges['item_i']]
-            edge_dst = [local_to_global[item_to_idx[j]] for j in session_edges['item_j']]
+            edge_src = [local_to_global[item_to_idx[i]] for i in session_edges["item_i"]]
+            edge_dst = [local_to_global[item_to_idx[j]] for j in session_edges["item_j"]]
             edge_index = torch.tensor([edge_src + edge_dst, edge_dst + edge_src], dtype=torch.long)
         else:
             # Create self-loops if no edges
@@ -298,7 +296,9 @@ def run_all_model_tests(
     batch, actual_num_items = create_batch_from_sessions(
         sessions_df, graph_df, batch_size=16, num_negatives=5
     )
-    print(f"Created batch: {batch.num_graphs} sessions, {batch.num_nodes} nodes, {batch.num_edges} edges")
+    print(
+        f"Created batch: {batch.num_graphs} sessions, {batch.num_nodes} nodes, {batch.num_edges} edges"
+    )
 
     # Common configuration (no num_heads - added per model)
     common_config = {
@@ -364,8 +364,10 @@ def print_results_summary(results: list[dict]):
 
     for r in results:
         status = r["status"]
-        loss = f"{r.get('final_loss', 'N/A'):.4f}" if r.get('final_loss') else "N/A"
-        params = f"{r.get('param_count_millions', 0):.2f}M" if r.get('param_count_millions') else "N/A"
+        loss = f"{r.get('final_loss', 'N/A'):.4f}" if r.get("final_loss") else "N/A"
+        params = (
+            f"{r.get('param_count_millions', 0):.2f}M" if r.get("param_count_millions") else "N/A"
+        )
         time_str = f"{r['duration']:.2f}s"
         print(f"{r['model']:<35} {status:<8} {loss:<10} {params:<12} {time_str:<8}")
 
@@ -384,7 +386,9 @@ def main():
     parser = argparse.ArgumentParser(description="Full ML Pipeline")
     parser.add_argument("--quick", action="store_true", help="Quick validation (100 sessions)")
     parser.add_argument("--full", action="store_true", help="Full training")
-    parser.add_argument("--num-sessions", type=int, default=100, help="Number of sessions for testing")
+    parser.add_argument(
+        "--num-sessions", type=int, default=100, help="Number of sessions for testing"
+    )
     parser.add_argument("--num-epochs", type=int, default=3, help="Training epochs per model")
     parser.add_argument("--device", type=str, default="cpu", choices=["cpu", "cuda"])
     args = parser.parse_args()
@@ -426,7 +430,7 @@ def main():
     )
 
     # Get number of items
-    num_items = sessions_subset['itemid'].nunique()
+    num_items = sessions_subset["itemid"].nunique()
 
     # Run all model tests
     results = run_all_model_tests(

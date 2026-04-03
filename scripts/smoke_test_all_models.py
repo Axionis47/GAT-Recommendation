@@ -92,7 +92,7 @@ def train_one_epoch(
         session_embeddings,
         batch.target_item,
         batch.negative_items,
-        model.get_item_embeddings(),
+        model.item_embedding,
     )
 
     # Backward pass
@@ -196,7 +196,11 @@ def main() -> int:
 
     # Models to test
     models = [
-        ("GraphSAGE", create_graphsage, base_config),
+        (
+            "GraphSAGE",
+            create_graphsage,
+            {k: v for k, v in base_config.items() if k != "num_heads"},
+        ),
         ("GAT", create_gat, base_config),
         (
             "GraphTransformer (with FFN)",
@@ -215,9 +219,7 @@ def main() -> int:
 
     for model_name, create_fn, config in models:
         print(f"\nTesting {model_name}...")
-        success, message, duration = test_model(
-            model_name, create_fn, config, device, args.epochs
-        )
+        success, message, duration = test_model(model_name, create_fn, config, device, args.epochs)
 
         status = "PASS" if success else "FAIL"
         results.append((model_name, status, message, duration))

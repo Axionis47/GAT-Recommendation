@@ -23,6 +23,7 @@ from pydantic import BaseModel
 
 try:
     import onnxruntime as ort
+
     ONNX_AVAILABLE = True
 except ImportError:
     ONNX_AVAILABLE = False
@@ -206,4 +207,5 @@ async def recommend_batch(sessions: list[RecommendRequest]):
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

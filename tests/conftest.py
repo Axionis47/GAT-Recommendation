@@ -66,9 +66,7 @@ def dummy_batch_with_targets(dummy_batch):
     batch.target_item = torch.tensor([10, 20])  # Items to predict
 
     # Negative items for contrastive learning (5 negatives per sample)
-    batch.negative_items = torch.tensor(
-        [[11, 12, 13, 14, 15], [21, 22, 23, 24, 25]]
-    )
+    batch.negative_items = torch.tensor([[11, 12, 13, 14, 15], [21, 22, 23, 24, 25]])
 
     return batch
 

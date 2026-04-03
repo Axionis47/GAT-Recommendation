@@ -109,7 +109,11 @@ EMBEDDINGS_PATH = os.getenv("EMBEDDINGS_PATH", "/app/model/item_embeddings.npy")
 
 # Determine the GCS source for model artifacts
 # Priority: AIP_STORAGE_URI (Vertex AI managed) > GCS_MODEL_URI (explicit)
-GCS_ARTIFACT_SOURCE = AIP_STORAGE_URI.rstrip("/") if AIP_STORAGE_URI else GCS_MODEL_URI.rstrip("/") if GCS_MODEL_URI else ""
+GCS_ARTIFACT_SOURCE = (
+    AIP_STORAGE_URI.rstrip("/")
+    if AIP_STORAGE_URI
+    else GCS_MODEL_URI.rstrip("/") if GCS_MODEL_URI else ""
+)
 
 
 # ---------------------------------------------------------------------------
@@ -223,9 +227,9 @@ class DriftDetector:
         # Keep only recent window + reference
         max_buffer = self.window_size + self.reference_size
         if len(self.score_buffer) > max_buffer:
-            self.score_buffer = self.score_buffer[-self.window_size:]
-            self.session_length_buffer = self.session_length_buffer[-self.window_size:]
-            self.top_item_buffer = self.top_item_buffer[-self.window_size:]
+            self.score_buffer = self.score_buffer[-self.window_size :]
+            self.session_length_buffer = self.session_length_buffer[-self.window_size :]
+            self.top_item_buffer = self.top_item_buffer[-self.window_size :]
 
     def check_drift(self) -> dict:
         """Run Evidently drift detection on current vs reference window."""
@@ -237,14 +241,18 @@ class DriftDetector:
             from evidently.metric_preset import DataDriftPreset
             from evidently.report import Report
 
-            ref_df = pd.DataFrame({
-                "score": self.reference_scores[:self.window_size],
-                "session_length": self.reference_session_lengths[:self.window_size],
-            })
-            cur_df = pd.DataFrame({
-                "score": self.score_buffer[-self.window_size:],
-                "session_length": self.session_length_buffer[-self.window_size:],
-            })
+            ref_df = pd.DataFrame(
+                {
+                    "score": self.reference_scores[: self.window_size],
+                    "session_length": self.reference_session_lengths[: self.window_size],
+                }
+            )
+            cur_df = pd.DataFrame(
+                {
+                    "score": self.score_buffer[-self.window_size :],
+                    "session_length": self.session_length_buffer[-self.window_size :],
+                }
+            )
 
             report = Report(metrics=[DataDriftPreset()])
             report.run(reference_data=ref_df, current_data=cur_df)
@@ -386,7 +394,9 @@ def load_pytorch_model():
     state.loaded = True
     state.model_version = str(checkpoint.get("epoch", "unknown"))
 
-    logger.info("PyTorch model loaded: %d items, %dd embeddings", state.num_items, state.embedding_dim)
+    logger.info(
+        "PyTorch model loaded: %d items, %dd embeddings", state.num_items, state.embedding_dim
+    )
 
 
 def load_onnx_model():
@@ -446,7 +456,9 @@ async def startup():
     try:
         # Download model files from GCS if not present locally
         if not Path(MODEL_PATH).exists() and GCS_ARTIFACT_SOURCE:
-            logger.info("[STARTUP] Model not at %s, downloading from %s...", MODEL_PATH, GCS_ARTIFACT_SOURCE)
+            logger.info(
+                "[STARTUP] Model not at %s, downloading from %s...", MODEL_PATH, GCS_ARTIFACT_SOURCE
+            )
             if INFERENCE_MODE == "onnx":
                 download_from_gcs(f"{GCS_ARTIFACT_SOURCE}/session_recommender.onnx", MODEL_PATH)
                 download_from_gcs(f"{GCS_ARTIFACT_SOURCE}/item_embeddings.npy", EMBEDDINGS_PATH)

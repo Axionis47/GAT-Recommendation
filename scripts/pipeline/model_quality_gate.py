@@ -91,13 +91,9 @@ def validate_artifact(checkpoint_path: Path, thresholds: dict) -> list[str]:
     # Check file size
     size_mb = checkpoint_path.stat().st_size / (1024 * 1024)
     if size_mb < thresholds["min_size_mb"]:
-        failures.append(
-            f"Checkpoint too small: {size_mb:.2f}MB < {thresholds['min_size_mb']}MB"
-        )
+        failures.append(f"Checkpoint too small: {size_mb:.2f}MB < {thresholds['min_size_mb']}MB")
     if size_mb > thresholds["max_size_mb"]:
-        failures.append(
-            f"Checkpoint too large: {size_mb:.2f}MB > {thresholds['max_size_mb']}MB"
-        )
+        failures.append(f"Checkpoint too large: {size_mb:.2f}MB > {thresholds['max_size_mb']}MB")
 
     # Try loading checkpoint
     try:
@@ -211,10 +207,7 @@ def validate_metrics(
     # Load data
     test_df = pd.read_csv(test_data_path)
     edges_df = pd.read_csv(graph_edges_path)
-    num_items = (
-        max(test_df["itemid"].max(), edges_df["item_i"].max(), edges_df["item_j"].max())
-        + 1
-    )
+    num_items = max(test_df["itemid"].max(), edges_df["item_i"].max(), edges_df["item_j"].max()) + 1
 
     # Load model
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
@@ -311,17 +304,13 @@ def validate_metrics(
     for key in threshold_keys:
         threshold = thresholds.get(key)
         if threshold is not None and metrics[key] < threshold:
-            failures.append(
-                f"{key}: {metrics[key]:.4f} < threshold {threshold:.4f}"
-            )
+            failures.append(f"{key}: {metrics[key]:.4f} < threshold {threshold:.4f}")
 
     return metrics, failures
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Model quality gate for deployment pipelines"
-    )
+    parser = argparse.ArgumentParser(description="Model quality gate for deployment pipelines")
     parser.add_argument(
         "--checkpoint",
         type=Path,
@@ -364,9 +353,7 @@ def main():
         default=None,
         help="Limit evaluation to N samples",
     )
-    parser.add_argument(
-        "--batch-size", type=int, default=32, help="Evaluation batch size"
-    )
+    parser.add_argument("--batch-size", type=int, default=32, help="Evaluation batch size")
     parser.add_argument(
         "--output",
         type=Path,
@@ -433,8 +420,10 @@ def main():
 
         if test_data.exists() and graph_edges.exists():
             print("\nPhase 2: Metric evaluation...")
-            print(f"  Thresholds: recall@10>={thresholds['recall_at_10']:.2f}, "
-                  f"ndcg@10>={thresholds['ndcg_at_10']:.2f}")
+            print(
+                f"  Thresholds: recall@10>={thresholds['recall_at_10']:.2f}, "
+                f"ndcg@10>={thresholds['ndcg_at_10']:.2f}"
+            )
 
             metrics, metric_failures = validate_metrics(
                 checkpoint_path=args.checkpoint,
@@ -459,9 +448,7 @@ def main():
     # Phase 3: Latency SLO check (if not skipped and no artifact failures)
     latency_metrics = {}
     if not args.skip_latency and not artifact_failures:
-        has_latency_slo = any(
-            thresholds.get(k) is not None for k in ["p50_ms", "p95_ms", "p99_ms"]
-        )
+        has_latency_slo = any(thresholds.get(k) is not None for k in ["p50_ms", "p95_ms", "p99_ms"])
         if has_latency_slo:
             print("\nPhase 3: Latency SLO check...")
 
@@ -472,8 +459,12 @@ def main():
 
             # Infer num_items and embedding_dim from state dict
             embedding_key = "item_embedding.weight"
-            num_items_latency = state_dict[embedding_key].shape[0] if embedding_key in state_dict else 100
-            embedding_dim_latency = state_dict[embedding_key].shape[1] if embedding_key in state_dict else 256
+            num_items_latency = (
+                state_dict[embedding_key].shape[0] if embedding_key in state_dict else 100
+            )
+            embedding_dim_latency = (
+                state_dict[embedding_key].shape[1] if embedding_key in state_dict else 256
+            )
 
             if not model_kwargs:
                 model_kwargs = {
@@ -498,9 +489,7 @@ def main():
             filtered = {k: v for k, v in state_dict.items() if "_cached_pe" not in k}
             latency_model.load_state_dict(filtered, strict=False)
 
-            latency_metrics, latency_failures = validate_latency(
-                latency_model, thresholds
-            )
+            latency_metrics, latency_failures = validate_latency(latency_model, thresholds)
             all_failures.extend(latency_failures)
 
             for key, value in latency_metrics.items():
