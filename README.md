@@ -85,6 +85,7 @@ Start here and follow the links:
 | [Experiments](docs/EXPERIMENTS.md) | Results, ablations, cost analysis, lessons |
 | [Deployment](docs/DEPLOYMENT.md) | Serving, Docker, Terraform, monitoring |
 | [Parameters](docs/PARAMETERS.md) | Complete parameter reference |
+| [Design Rationale](docs/DESIGN_RATIONALE.md) | Why every parameter has its value (the reasoning chain) |
 
 ## Key Technical Decisions
 

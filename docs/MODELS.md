@@ -2,6 +2,8 @@
 
 This document explains every model in the system: how they work, what every parameter does, and why each design decision was made.
 
+> **Why these specific values?** Every parameter traces back to the data. Session length drives graph density, which drives layer count, which drives model capacity. See [Design Rationale](DESIGN_RATIONALE.md) for the full reasoning chain.
+
 ## Shared Architecture
 
 All four models follow the same pattern:

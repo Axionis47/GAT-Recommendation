@@ -2,6 +2,8 @@
 
 Every tunable parameter in the system, where it is configured, and why it has its current value.
 
+> **Why these specific values?** The parameters are not independent choices. Session length cascades into graph density, which cascades into layer count, which cascades into model capacity. See [Design Rationale](DESIGN_RATIONALE.md) for the full reasoning chain from data to parameters.
+
 ---
 
 ## Data Pipeline Parameters
