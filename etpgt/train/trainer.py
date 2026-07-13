@@ -197,20 +197,6 @@ class Trainer:
             torch.save(checkpoint, best_path)
             logger.info(f"Saved best checkpoint to {best_path}")
 
-    def load_checkpoint(self, checkpoint_path: Path | str) -> None:
-        """Load checkpoint.
-
-        Args:
-            checkpoint_path: Path to checkpoint.
-        """
-        checkpoint = torch.load(checkpoint_path, map_location=self.device)
-        self.model.load_state_dict(checkpoint["model_state_dict"])
-        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        self.current_epoch = checkpoint["epoch"]
-        self.best_val_metric = checkpoint["best_val_metric"]
-        self.history = checkpoint["history"]
-        logger.info(f"Loaded checkpoint from {checkpoint_path}")
-
     def train(self) -> dict:
         """Train the model.
 

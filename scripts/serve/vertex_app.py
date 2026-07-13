@@ -121,13 +121,6 @@ GCS_ARTIFACT_SOURCE = (
 # ---------------------------------------------------------------------------
 
 
-class VertexInstance(BaseModel):
-    """Single prediction instance."""
-
-    session_items: list[int]
-    k: int = 10
-
-
 class VertexPredictRequest(BaseModel):
     """Vertex AI prediction request format."""
 

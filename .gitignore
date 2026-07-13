@@ -84,6 +84,7 @@ mlruns/
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb
+!notebooks/session_recsys_walkthrough.ipynb
 
 # macOS
 .DS_Store
