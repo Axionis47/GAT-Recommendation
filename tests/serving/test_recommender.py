@@ -66,7 +66,7 @@ def test_app_runs_the_gate_then_the_model(monkeypatch):
 
     # Replace the loader so lifespan uses the fake instead of the 1.5 GB checkpoint.
     monkeypatch.setattr(
-        app_module.Recommender, "from_default", classmethod(lambda cls, **kw: FakeRecommender())
+        app_module.Recommender, "from_default", classmethod(lambda _cls, **_kw: FakeRecommender())
     )
 
     with TestClient(app_module.app) as client:

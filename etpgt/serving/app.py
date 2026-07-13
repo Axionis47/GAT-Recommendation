@@ -23,7 +23,7 @@ _state: dict = {"recommender": None}
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     try:
         _state["recommender"] = Recommender.from_default()
     except Exception as exc:  # missing checkpoint / graph: serve /health, refuse /recommend
